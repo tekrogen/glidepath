@@ -1,0 +1,417 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# ==============================================================================
+# OS-Specific Files
+# ==============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ==============================================================================
+# Editor / IDE Files
+# ==============================================================================
+
+# JetBrains / IntelliJ IDEA
+.idea/
+.idea/vcs.xml
+!.idea/codeStyles/
+!.idea/runConfigurations/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+atlassian-ide-plugin.xml
+
+# JetBrains AI Assistant (local, per-machine)
+.ai/
+.aiignore
+
+# AWS User-specific
+.idea/**/aws.xml
+
+# Generated files
+.idea/**/contentModel.xml
+
+# Sensitive or high-churn files
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.vscode-test
+
+# Vim
+*.swo
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==============================================================================
+# Environment Variables & Secrets
+# ==============================================================================
+
+# Ignore all .env* files at any location except .env.example
+**/.env*
+!.env.example
+!**/.env.example
+
+# Security-sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.pb
+*.secret
+secrets/
+*.private
+id_rsa*
+*.p8
+*.keychain
+
+# ==============================================================================
+# Dependencies
+# ==============================================================================
+
+# Node.js
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+/.yarn/*
+!/.yarn/releases
+!/.yarn/plugins
+!/.yarn/sdks
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+# Python virtualenv lib (not src/lib/)
+lib64/
+
+# Don't ignore Next.js src/lib
+!**/src/lib/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+.python-version
+
+# Bower
+bower_components/
+
+# ==============================================================================
+# Build Outputs & Compiled Files
+# ==============================================================================
+
+# General
+dist/
+out/
+gen/
+
+# Next.js
+.next/
+next-env.d.ts
+
+# Velite (auto-generated from content/docs/)
+.velite/
+
+# Nuxt.js
+.nuxt/
+
+# Gatsby
+public/
+
+# Vuepress
+.vuepress/dist
+.temp
+
+# Docusaurus
+.docusaurus/
+# FuseBox
+.fusebox/
+
+# Turborepo
+.turbo
+.turbo/
+
+# Contentlayer
+.contentlayer/
+/.contentlayer/**
+
+# CMake
+cmake-build-*/
+
+# ==============================================================================
+# Testing & Coverage
+# ==============================================================================
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test results
+test-results/
+playwright-report/
+playwright/.cache/
+.playwright-mcp/
+tests/.auth/
+
+# ==============================================================================
+# Runtime Directories
+# ==============================================================================
+
+backups/
+scripts/pids/
+
+# Logs & Debug Files
+# ==============================================================================
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ==============================================================================
+# Cache & Temporary Files
+# ==============================================================================
+
+# Node.js caches
+.npm
+.eslintcache
+.stylelintcache
+.node_repl_history
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.parcel-cache
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# General temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+.cache/
+
+# ==============================================================================
+# Database & Data Files
+# ==============================================================================
+
+# DynamoDB Local
+.dynamodb/
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# ==============================================================================
+# Package Manager Files
+# ==============================================================================
+
+# npm
+*.tgz
+package-lock.json
+
+# Yarn
+.yarn-integrity
+
+# pnpm
+# NOTE: pnpm-lock.yaml is NOT ignored — it must be committed for reproducible CI builds
+.pnpm-store/
+
+# ==============================================================================
+# Framework-Specific
+# ==============================================================================
+
+# Grunt
+.grunt/
+
+# TernJS
+.tern-port
+
+# Snowpack
+web_modules/
+
+# ==============================================================================
+# Generated & Auto-Generated Files
+# ==============================================================================
+
+# TypeScript
+*.tsbuildinfo
+
+# Public generated files (if auto-generated)
+public/sitemap.xml
+public/feed.xml
+public/search.json
+
+# XML (except browserconfig.xml)
+*.xml
+!browserconfig.xml
+
+# ==============================================================================
+# Deployment & CI/CD
+# ==============================================================================
+
+# Vercel
+.vercel
+
+# Serverless
+.serverless/
+
+# ==============================================================================
+# Miscellaneous
+# ==============================================================================
+
+# Lock files (uncomment if you want to ignore them)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Compiled binary addons
+build/Release
+
+# Directory for instrumented libs
+lib-cov/
+
+# node-waf configuration
+.lock-wscript
+
+# ==============================================================================
+# Custom User Additions
+# ==============================================================================
+
+# Git branch DDD contexts config (project-specific customization)
+.git-branch-contexts.json
+
+# Add your custom ignore patterns below this line
+# Example:
+# custom-directory/
+# *.custom-extension
+
+# Local SSL certificates (generated by mkcert)
+certificates/
+
+# Claude Code local settings (user-specific, not shared)
+.claude/settings.local.json
+
+# Codebase analysis output directory (generated by codebase-analysis skill)
+.analysis/
+
+
+/admin/internal/
+
+
+# Claude Code private memory (developer-specific, not shared)
+CLAUDE.local.md

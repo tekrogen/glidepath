@@ -1,0 +1,303 @@
+// Prisma schema — Credit Card Manager
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String        @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  phone         String?
+  role          UserRole      @default(USER)
+  status        AccountStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  userAccounts UserAccount[]
+  transactions Transaction[]
+  budgets      Budget[]
+  insights     AIInsight[]
+  preferences  UserPreferences?
+  auditLogs    AuditLog[]
+  plaidItems   PlaidItem[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Financial models
+model UserAccount {
+  id            String      @id @default(cuid())
+  userId        String
+  name          String
+  type          AccountType
+  balance       Decimal     @default(0) @db.Decimal(12, 2)
+  currency      String      @default("USD")
+  institution   String
+  accountNumber String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id                  String            @id @default(cuid())
+  accountId           String
+  userId              String
+  amount              Decimal           @db.Decimal(12, 2)
+  description         String
+  originalDescription String? // For banks that provide both
+  category            String
+  subcategory         String?
+  merchant            String?
+  date                DateTime
+  time                String? // Some banks provide separate time
+  type                TransactionType
+  status              TransactionStatus @default(COMPLETED)
+  tags                String[]
+  location            Json?
+
+  // Import tracking fields
+  importSource String? @unique // e.g., "plaid_<transaction_id>" — globally unique; enforces sync idempotency
+  importBatch  String? // Track which import batch this came from
+  originalData Json? // Store original raw data for debugging
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account UserAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([accountId])
+  @@index([category])
+  @@index([importBatch])
+}
+
+model Budget {
+  id        String       @id @default(cuid())
+  userId    String
+  name      String
+  category  String
+  amount    Decimal      @db.Decimal(12, 2)
+  spent     Decimal      @default(0) @db.Decimal(12, 2)
+  period    BudgetPeriod
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, period, isActive])
+}
+
+model AIInsight {
+  id          String      @id @default(cuid())
+  userId      String
+  type        InsightType
+  title       String
+  description String
+  impact      Impact
+  category    String
+  source      String?     @default("spending")
+  actionable  Boolean     @default(false)
+  isRead      Boolean     @default(false)
+  expiresAt   DateTime?
+  createdAt   DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
+}
+
+// Category system for transaction classification
+model Category {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  type      CategoryType
+  parentId  String?
+  level     Int          @default(0) // 0 = main category, 1 = subcategory
+  keywords  String[] // Keywords for auto-categorization
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  @@index([type, isActive])
+  @@index([parentId])
+}
+
+// User preferences (one-to-one with User)
+model UserPreferences {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  theme                String   @default("system")
+  compactMode          Boolean  @default(false)
+  emailNotifications   Boolean  @default(true)
+  browserNotifications Boolean  @default(false)
+  bio                  String?
+  location             String?
+  socialLinks          Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Audit log for tracking user actions
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   String?  @db.Text
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action])
+}
+
+// Plaid integration
+enum PlaidItemStatus {
+  ACTIVE
+  PENDING_EXPIRATION
+  LOGIN_REQUIRED
+  REVOKED
+  DISCONNECTED
+}
+
+model PlaidItem {
+  id               String          @id @default(cuid())
+  userId           String
+  accessToken      String // AES-256-GCM encrypted
+  itemId           String          @unique
+  institutionId    String?
+  institutionName  String?
+  status           PlaidItemStatus @default(ACTIVE)
+  consentExpiresAt DateTime?
+  cursor           String? // Plaid transactions sync cursor
+  lastSyncedAt     DateTime?
+  syncInProgress   Boolean         @default(false) // Per-item sync lock (compare-and-swap)
+  syncStartedAt    DateTime? // When the current sync acquired the lock (stale-lock recovery)
+  errorCode        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT
+  INVESTMENT
+  LOAN
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum InsightType {
+  OPPORTUNITY
+  WARNING
+  TREND
+  TIP
+}
+
+enum Impact {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}

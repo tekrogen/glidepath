@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@import "./css/styles.css";
+
+/* Use class-based dark mode (.dark on <html>) instead of prefers-color-scheme.
+   Required because next-themes toggles a .dark class, not the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Note: All CSS variables and @theme mappings are defined in:
+ * - src/app/css/styles.css (base variables and theme-specific overrides)
+ * - src/app/css/shared-styles.css (@theme inline mappings)
+ * 
+ * This file should only contain imports and platform-specific fixes.
+ */
+
+/* ===== iOS-SPECIFIC FIXES ===== */
+/* Target iOS Safari/Edge using -webkit-touch-callout support detection */
+@supports (-webkit-touch-callout: none) {
+  /* Fix text rendering */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Fix flexbox gaps (fallback for older iOS) */
+  .flex.gap-6 > * + * {
+    margin-left: 1.5rem;
+  }
+
+  .flex.gap-4 > * + * {
+    margin-left: 1rem;
+  }
+
+  .flex.gap-2 > * + * {
+    margin-left: 0.5rem;
+  }
+
+  /* Ensure proper overflow handling */
+  .overflow-hidden {
+    overflow: hidden !important;
+  }
+
+  /* Fix viewport height issues */
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+
+  /* Prevent text selection issues */
+  .whitespace-nowrap {
+    white-space: nowrap !important;
+  }
+
+  /* Ensure adequate touch targets (44x44px minimum for iOS) */
+  button, a, [role="button"] {
+    min-height: 44px;
+  }
+
+  /* Fix container overflow */
+  .container {
+    overflow-x: hidden;
+  }
+
+  /* Fix SVG rendering */
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+}

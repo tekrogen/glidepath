@@ -1,0 +1,27 @@
+name: Release Please
+
+# Aggregates conventional commits on main into a release PR that bumps
+# package.json, updates CHANGELOG.md, and tags a GitHub release when merged.
+#
+# NOTE: Release Please parses commit headers on main. Use squash merge for
+# feature PRs with a plain conventional title (e.g. "feat(budgets): rollover
+# support") — the local emoji prefix added by .husky/commit-msg is fine on
+# branch commits but must not appear in the squash title, or the commit is
+# ignored for versioning.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

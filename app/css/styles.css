@@ -1,0 +1,710 @@
+/* Import shared theme tokens */
+/* Note: Tailwind is imported in globals.css */
+@import "./shared-styles.css";
+
+/* CSS Variables - Light Theme (Wealth Dashboard Brand Colors) */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 210 20% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 210 20% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 20% 15%;
+
+  /* Brand Primary Blue - #446e88 */
+  --primary: 201 35% 40%;
+  --primary-foreground: 0 0% 98%;
+
+  /* Brand Secondary Cyan - #0db4b9 */
+  --secondary: 181 86% 39%;
+  --secondary-foreground: 0 0% 98%;
+
+  /* Brand Accent Mint - #7edba5 */
+  --accent: 147 56% 67%;
+  --accent-foreground: 210 20% 15%;
+
+  --muted: 210 20% 96%;
+  --muted-foreground: 210 10% 45%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 210 20% 90%;
+  --input: 210 20% 90%;
+  --ring: 201 35% 40%;
+  --radius: 0.5rem;
+
+  /* Status Colors */
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 98%;
+  --warning: 45 93% 47%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 84.2% 60.2%;
+  --error-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors */
+  --timer-safe: 142 76% 36%;
+  --timer-warning: 45 93% 47%;
+  --timer-urgent: 0 84.2% 60.2%;
+
+  /* Extended Brand Color Families */
+  /* Primary Blue Family */
+  --primary-lighter: 201 27% 69%;
+  --primary-light: 204 30% 53%;
+  --primary-main: 201 35% 40%;
+  --primary-dark: 203 32% 36%;
+  --primary-darker: 205 30% 31%;
+
+  /* Secondary Cyan Family */
+  --secondary-lighter: 147 56% 67%;
+  --secondary-light: 159 67% 52%;
+  --secondary-main: 181 86% 39%;
+  --secondary-dark: 189 92% 34%;
+  --secondary-darker: 189 80% 31%;
+
+  /* Chart colors with brand palette */
+  --chart-1: 201 35% 40%;
+  --chart-2: 181 86% 39%;
+  --chart-3: 147 56% 67%;
+  --chart-4: 159 67% 52%;
+  --chart-5: 189 80% 31%;
+
+  /* Sidebar */
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 210 10% 30%;
+  --sidebar-primary: 201 35% 40%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 201 35% 95%;
+  --sidebar-accent-foreground: 201 35% 40%;
+  --sidebar-border: 210 20% 90%;
+  --sidebar-ring: 201 35% 40%;
+}
+
+/* CSS Variables - Dark Theme */
+.dark {
+  --background: 220 20% 8%;
+  --foreground: 0 0% 95%;
+  --card: 220 20% 10%;
+  --card-foreground: 0 0% 95%;
+  --popover: 220 20% 10%;
+  --popover-foreground: 0 0% 95%;
+
+  /* Brand Primary Blue (lighter for dark mode) */
+  --primary: 201 45% 55%;
+  --primary-foreground: 220 20% 8%;
+
+  /* Brand Secondary Cyan (vibrant for dark mode) */
+  --secondary: 181 80% 45%;
+  --secondary-foreground: 220 20% 8%;
+
+  /* Brand Accent Mint */
+  --accent: 147 50% 55%;
+  --accent-foreground: 220 20% 8%;
+
+  --muted: 220 15% 15%;
+  --muted-foreground: 210 10% 60%;
+  --destructive: 0 62.8% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 220 15% 18%;
+  --input: 220 15% 18%;
+  --ring: 201 45% 55%;
+
+  /* Status Colors - Dark Mode */
+  --success: 142 70% 45%;
+  --success-foreground: 0 0% 5%;
+  --warning: 45 90% 55%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 72% 55%;
+  --error-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors - Dark Mode */
+  --timer-safe: 142 70% 45%;
+  --timer-warning: 45 90% 55%;
+  --timer-urgent: 0 72% 55%;
+
+  /* Extended Brand Color Families - Dark Mode */
+  --primary-lighter: 201 40% 70%;
+  --primary-light: 201 42% 60%;
+  --primary-main: 201 45% 55%;
+  --primary-dark: 201 40% 45%;
+  --primary-darker: 201 38% 35%;
+
+  --secondary-lighter: 147 50% 65%;
+  --secondary-light: 159 60% 55%;
+  --secondary-main: 181 80% 45%;
+  --secondary-dark: 189 85% 40%;
+  --secondary-darker: 189 75% 35%;
+
+  /* Chart colors - Dark Mode */
+  --chart-1: 201 45% 55%;
+  --chart-2: 181 80% 45%;
+  --chart-3: 147 50% 55%;
+  --chart-4: 159 60% 55%;
+  --chart-5: 189 75% 35%;
+
+  /* Sidebar - Dark Mode */
+  --sidebar-background: 220 20% 10%;
+  --sidebar-foreground: 210 10% 85%;
+  --sidebar-primary: 201 45% 55%;
+  --sidebar-primary-foreground: 220 20% 8%;
+  --sidebar-accent: 220 15% 15%;
+  --sidebar-accent-foreground: 201 45% 65%;
+  --sidebar-border: 220 15% 18%;
+  --sidebar-ring: 201 45% 55%;
+}
+
+/* =============================================================================
+   Color Theme: Orange
+   Warm, energetic theme with split-complementary color harmony
+   Primary: Orange (24°) | Secondary: Teal (181°) | Accent: Gold (45°)
+   ============================================================================= */
+[data-theme="orange"] {
+  /* Primary Orange - Brand identity, CTAs */
+  --primary: 24 95% 41%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary Teal - Contrasting support color (split-complementary) */
+  --secondary: 181 70% 38%;
+  --secondary-foreground: 0 0% 100%;
+
+  /* Accent Gold - Highlights, badges (analogous but distinct) */
+  --accent: 45 90% 48%;
+  --accent-foreground: 0 0% 5%;
+
+  --ring: 24 95% 41%;
+
+  /* Status Colors */
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 98%;
+  --warning: 45 93% 47%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 84.2% 60.2%;
+  --error-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors */
+  --timer-safe: 142 76% 36%;
+  --timer-warning: 45 93% 47%;
+  --timer-urgent: 0 84.2% 60.2%;
+
+  /* Extended Orange Palette */
+  --primary-lighter: 24 90% 65%;
+  --primary-light: 24 92% 53%;
+  --primary-main: 24 95% 41%;
+  --primary-dark: 24 90% 35%;
+  --primary-darker: 24 85% 28%;
+
+  /* Extended Teal Palette */
+  --secondary-lighter: 181 60% 60%;
+  --secondary-light: 181 65% 48%;
+  --secondary-main: 181 70% 38%;
+  --secondary-dark: 181 70% 32%;
+  --secondary-darker: 181 65% 26%;
+}
+
+/* Orange theme in dark mode */
+[data-theme="orange"].dark,
+.dark[data-theme="orange"] {
+  /* Primary Orange - Lighter for dark mode visibility */
+  --primary: 24 90% 55%;
+  --primary-foreground: 0 0% 5%;
+
+  /* Secondary Teal - Brighter for dark mode */
+  --secondary: 181 65% 50%;
+  --secondary-foreground: 0 0% 5%;
+
+  /* Accent Gold - Vibrant for dark mode */
+  --accent: 45 85% 55%;
+  --accent-foreground: 0 0% 5%;
+
+  --ring: 24 90% 55%;
+
+  /* Status Colors - Dark Mode */
+  --success: 142 70% 45%;
+  --success-foreground: 0 0% 5%;
+  --warning: 45 90% 55%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 72% 55%;
+  --error-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors - Dark Mode */
+  --timer-safe: 142 70% 45%;
+  --timer-warning: 45 90% 55%;
+  --timer-urgent: 0 72% 55%;
+
+  /* Extended Orange Palette - Dark Mode */
+  --primary-lighter: 24 85% 70%;
+  --primary-light: 24 88% 60%;
+  --primary-main: 24 90% 55%;
+  --primary-dark: 24 85% 45%;
+  --primary-darker: 24 80% 38%;
+
+  /* Extended Teal Palette - Dark Mode */
+  --secondary-lighter: 181 55% 65%;
+  --secondary-light: 181 60% 55%;
+  --secondary-main: 181 65% 50%;
+  --secondary-dark: 181 65% 40%;
+  --secondary-darker: 181 60% 32%;
+}
+
+/* =============================================================================
+   Color Theme: Blue (Default brand theme)
+   Professional theme with blue and cyan accents
+   Note: Blue is the default, so :root already has these values
+   This selector ensures explicit selection works
+   ============================================================================= */
+[data-theme="blue"] {
+  --primary: 201 35% 40%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 181 86% 39%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 147 56% 67%;
+  --accent-foreground: 210 20% 15%;
+  --ring: 201 35% 40%;
+
+  /* Status Colors */
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 98%;
+  --warning: 45 93% 47%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 84.2% 60.2%;
+  --error-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors */
+  --timer-safe: 142 76% 36%;
+  --timer-warning: 45 93% 47%;
+  --timer-urgent: 0 84.2% 60.2%;
+
+  --primary-lighter: 201 27% 69%;
+  --primary-light: 204 30% 53%;
+  --primary-main: 201 35% 40%;
+  --primary-dark: 203 32% 36%;
+  --primary-darker: 205 30% 31%;
+
+  --secondary-lighter: 147 56% 67%;
+  --secondary-light: 159 67% 52%;
+  --secondary-main: 181 86% 39%;
+  --secondary-dark: 189 92% 34%;
+  --secondary-darker: 189 80% 31%;
+}
+
+/* Blue theme in dark mode */
+[data-theme="blue"].dark,
+.dark[data-theme="blue"] {
+  --primary: 201 45% 55%;
+  --primary-foreground: 220 20% 8%;
+  --secondary: 181 80% 45%;
+  --secondary-foreground: 220 20% 8%;
+  --accent: 147 50% 55%;
+  --accent-foreground: 220 20% 8%;
+  --ring: 201 45% 55%;
+
+  /* Status Colors - Dark Mode */
+  --success: 142 70% 45%;
+  --success-foreground: 0 0% 5%;
+  --warning: 45 90% 55%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 72% 55%;
+  --error-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors - Dark Mode */
+  --timer-safe: 142 70% 45%;
+  --timer-warning: 45 90% 55%;
+  --timer-urgent: 0 72% 55%;
+
+  --primary-lighter: 201 40% 70%;
+  --primary-light: 201 42% 60%;
+  --primary-main: 201 45% 55%;
+  --primary-dark: 201 40% 45%;
+  --primary-darker: 201 38% 35%;
+}
+
+/* =============================================================================
+   Color Theme: DevFlow Brand
+   Official DevFlow brand colors with orange primary on dark background
+   ============================================================================= */
+[data-theme="midnight"] {
+  /* Semantic Colors - Dark-first design */
+  --background: 0 0% 4%;           /* #0a0a0a - Near Black */
+  --foreground: 0 0% 93%;          /* #ededed - Light Gray */
+  --card: 0 0% 9%;                 /* #171717 - Dark Gray */
+  --card-foreground: 0 0% 93%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 93%;
+  --muted: 0 0% 15%;               /* #262626 - Medium Gray */
+  --muted-foreground: 0 0% 64%;    /* #a3a3a3 - Gray */
+
+  /* Primary Orange - #f97316 */
+  --primary: 24 95% 53%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary & Accent (orange variations) */
+  --secondary: 24 90% 50%;
+  --secondary-foreground: 0 0% 100%;
+  --accent: 24 95% 53%;
+  --accent-foreground: 0 0% 5%;
+
+  /* Borders & Inputs */
+  --border: 0 0% 15%;
+  --input: 0 0% 15%;
+  --ring: 24 95% 53%;
+
+  /* Status Colors */
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 100%;
+  --warning: 45 93% 47%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 84.2% 60.2%;
+  --error-foreground: 0 0% 100%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Countdown Timer Colors */
+  --timer-safe: 142 76% 36%;
+  --timer-warning: 45 93% 47%;
+  --timer-urgent: 0 84.2% 60.2%;
+
+  /* Extended Palette */
+  --primary-lighter: 24 90% 65%;
+  --primary-light: 24 92% 58%;
+  --primary-main: 24 95% 53%;
+  --primary-dark: 24 90% 45%;
+  --primary-darker: 24 85% 38%;
+
+  --secondary-lighter: 24 85% 65%;
+  --secondary-light: 24 88% 55%;
+  --secondary-main: 24 90% 50%;
+  --secondary-dark: 24 85% 40%;
+  --secondary-darker: 24 80% 32%;
+
+  /* Chart colors */
+  --chart-1: 24 95% 53%;
+  --chart-2: 24 90% 50%;
+  --chart-3: 142 76% 36%;
+  --chart-4: 45 93% 47%;
+  --chart-5: 0 84.2% 60.2%;
+
+  /* Sidebar */
+  --sidebar-background: 0 0% 9%;
+  --sidebar-foreground: 0 0% 93%;
+  --sidebar-primary: 24 95% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 15%;
+  --sidebar-accent-foreground: 24 95% 53%;
+  --sidebar-border: 0 0% 15%;
+  --sidebar-ring: 24 95% 53%;
+}
+
+/* DevFlow Brand theme in dark mode (slightly adjusted for better contrast) */
+[data-theme="midnight"].dark,
+.dark[data-theme="midnight"] {
+  /* Slightly lighter primary for dark mode readability */
+  --primary: 24 90% 60%;
+  --primary-foreground: 0 0% 5%;
+
+  --background: 0 0% 2%;           /* Even darker */
+  --foreground: 0 0% 95%;          /* Brighter text */
+  --card: 0 0% 6%;
+  --card-foreground: 0 0% 95%;
+  --popover: 0 0% 6%;
+  --popover-foreground: 0 0% 95%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 70%;
+  --border: 0 0% 12%;
+  --input: 0 0% 12%;
+  --ring: 24 90% 60%;
+
+  --secondary: 24 85% 65%;
+  --secondary-foreground: 0 0% 5%;
+  --accent: 24 88% 60%;
+  --accent-foreground: 0 0% 5%;
+
+  /* Status Colors - Dark Mode */
+  --success: 142 70% 45%;
+  --success-foreground: 0 0% 5%;
+  --warning: 45 90% 55%;
+  --warning-foreground: 0 0% 5%;
+  --error: 0 72% 55%;
+  --error-foreground: 0 0% 98%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 98%;
+
+  /* Countdown Timer Colors - Dark Mode */
+  --timer-safe: 142 70% 45%;
+  --timer-warning: 45 90% 55%;
+  --timer-urgent: 0 72% 55%;
+
+  --primary-lighter: 24 85% 70%;
+  --primary-light: 24 88% 65%;
+  --primary-main: 24 90% 60%;
+  --primary-dark: 24 85% 50%;
+  --primary-darker: 24 80% 42%;
+
+  /* Chart colors - Dark Mode */
+  --chart-1: 24 90% 60%;
+  --chart-2: 24 85% 65%;
+  --chart-3: 142 70% 45%;
+  --chart-4: 45 90% 55%;
+  --chart-5: 0 72% 55%;
+
+  /* Sidebar - Dark Mode */
+  --sidebar-background: 0 0% 6%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-primary: 24 90% 60%;
+  --sidebar-primary-foreground: 0 0% 5%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 24 90% 70%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-ring: 24 90% 60%;
+}
+
+/* Typography - Font Families */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-syne), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Typography - Headings use Syne */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+/* ===== ANIMATIONS ===== */
+
+/* Float Animation - Gentle floating motion */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Pulse Glow - Primary color pulsing glow */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.5);
+  }
+}
+
+/* Pulse Glow Cyan - Secondary color pulsing glow */
+@keyframes pulse-glow-cyan {
+  0%,
+  100% {
+    box-shadow: 0 0 20px hsl(var(--secondary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--secondary) / 0.5);
+  }
+}
+
+/* Shimmer Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Gradient Shift */
+@keyframes gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Fade In Up */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale In */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ===== ANIMATION UTILITY CLASSES ===== */
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-pulse-glow-cyan {
+  animation: pulse-glow-cyan 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary) / 0.1),
+    transparent
+  );
+  background-size: 200% 100%;
+}
+
+.animate-gradient {
+  animation: gradient-shift 3s ease infinite;
+  background-size: 200% 200%;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+/* ===== HOVER EFFECTS ===== */
+
+.hover-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 24px -8px hsl(var(--primary) / 0.15),
+    0 4px 8px -4px hsl(var(--primary) / 0.1);
+}
+
+.hover-glow {
+  transition: box-shadow 0.2s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 24px hsl(var(--primary) / 0.25);
+}
+
+/* ===== GLASSMORPHISM ===== */
+
+.glass {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: hsl(var(--background) / 0.8);
+}
+
+.glass-subtle {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: hsl(var(--background) / 0.6);
+}
+
+/* ===== GRADIENT UTILITIES ===== */
+
+.gradient-text {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--secondary)) 50%,
+    hsl(var(--primary-light)) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-primary {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary-dark)) 100%
+  );
+}
+
+.gradient-secondary {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--secondary)) 0%,
+    hsl(var(--secondary-dark)) 100%
+  );
+}
+
+.gradient-brand {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--secondary)) 100%
+  );
+}
+
+/* ===== BACKGROUND EFFECTS ===== */
+
+.bg-glow-primary {
+  position: relative;
+}
+
+.bg-glow-primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    hsl(var(--primary) / 0.15) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.bg-glow-secondary {
+  position: relative;
+}
+
+.bg-glow-secondary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    hsl(var(--secondary) / 0.15) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* ===== BORDER EFFECTS ===== */
+
+.border-gradient {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--background), var(--background)) padding-box,
+    linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))
+      border-box;
+}

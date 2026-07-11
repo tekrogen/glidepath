@@ -1,0 +1,93 @@
+#!/bin/sh
+
+# =============================================================================
+# commit-msg hook - Validate emoji conventional commit format
+# =============================================================================
+# Format: [emoji] type[(scope)]: description
+#
+# Examples:
+#   feat: add portfolio chart
+#   feat(investments): add portfolio chart
+#
+# With emoji (optional, auto-added if missing):
+#   ✨ feat: add portfolio chart
+#   🐛 fix(auth): resolve login redirect
+#
+# =============================================================================
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# Skip merge commits and revert commits
+if echo "$commit_msg" | head -1 | grep -qE "^(Merge|Revert) "; then
+    exit 0
+fi
+
+# Valid types
+VALID_TYPES="feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|security|deps"
+
+# Pattern: optional emoji + type + optional (scope) + : + space + description
+# Supports: "feat: msg", "feat(scope): msg", "✨ feat: msg", "✨ feat(scope): msg"
+# Use [^ ]+ (non-space chars) instead of [[:print:]] because macOS grep
+# inconsistently matches emoji with POSIX character classes.
+PATTERN="^([^ ]+ )?(${VALID_TYPES})(\([a-zA-Z0-9_. -]+\))?!?: .{1,}"
+
+if ! echo "$commit_msg" | head -1 | grep -qE "$PATTERN"; then
+    echo ""
+    echo "ERROR: Invalid commit message format!"
+    echo ""
+    echo "Expected: [emoji] type[(scope)]: description"
+    echo ""
+    echo "Valid types: feat, fix, docs, style, refactor, perf, test,"
+    echo "             build, ci, chore, revert, security, deps"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add new feature"
+    echo "  fix(auth): resolve login bug"
+    echo "  ✨ feat(investments): add portfolio chart"
+    echo "  🐛 fix: resolve crash on startup"
+    echo ""
+    echo "Your message was:"
+    echo "  $(head -1 "$commit_msg_file")"
+    echo ""
+    exit 1
+fi
+
+# =============================================================================
+# Auto-add emoji if missing
+# =============================================================================
+
+first_line=$(head -1 "$commit_msg_file")
+
+# Check if already has emoji (starts with non-ASCII or known emoji)
+if echo "$first_line" | grep -qE "^[a-zA-Z]"; then
+    # No emoji prefix - add one based on type
+    type=$(echo "$first_line" | sed -E "s/^(${VALID_TYPES}).*/\1/")
+
+    emoji=""
+    case "$type" in
+        feat)     emoji="✨" ;;
+        fix)      emoji="🐛" ;;
+        docs)     emoji="📝" ;;
+        style)    emoji="🎨" ;;
+        refactor) emoji="♻️" ;;
+        perf)     emoji="⚡" ;;
+        test)     emoji="✅" ;;
+        build)    emoji="🏗️" ;;
+        ci)       emoji="👷" ;;
+        chore)    emoji="🔧" ;;
+        revert)   emoji="⏪" ;;
+        security) emoji="🔒" ;;
+        deps)     emoji="📦" ;;
+    esac
+
+    if [ -n "$emoji" ]; then
+        # Prepend emoji to commit message
+        rest=$(tail -n +2 "$commit_msg_file")
+        if [ -n "$rest" ]; then
+            printf "%s %s\n%s" "$emoji" "$first_line" "$rest" > "$commit_msg_file"
+        else
+            printf "%s %s" "$emoji" "$first_line" > "$commit_msg_file"
+        fi
+    fi
+fi
