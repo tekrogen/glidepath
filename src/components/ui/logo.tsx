@@ -29,7 +29,7 @@ export function Logo({ size = "md", showText = true, className }: LogoProps) {
         <span
           className={`${textSize} font-heading font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent`}
         >
-          CardManager
+          Glidepath
         </span>
       )}
     </Link>

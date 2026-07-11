@@ -45,7 +45,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testMatch: /dashboard\.spec\.ts|settings-redirect\.spec\.ts|api-routes\.spec\.ts/,
+      testMatch: /dashboard\.spec\.ts|settings-redirect\.spec\.ts|api-routes\.spec\.ts|glidepath-pages\.spec\.ts/,
     },
   ],
 
