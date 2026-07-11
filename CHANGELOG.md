@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/tekrogen/glidepath/compare/v1.0.0...v1.1.0) (2026-07-11)
+
+
+### Features
+
+* add finance calculation library and canonical status engine ([e8cd45f](https://github.com/tekrogen/glidepath/commit/e8cd45f3ace543bb5144bfdba8cff79b4d607068))
+* adopt Glidepath product brand ([f9d6a09](https://github.com/tekrogen/glidepath/commit/f9d6a0904ef0a93da90ea6b680ae897ff9e2beef))
+
+
+### Refactoring
+
+* migrate app, components, and lib under src/ ([a01b274](https://github.com/tekrogen/glidepath/commit/a01b2743065e4158894a341dbe7896ba55bec596))
+
 ## [1.0.0] - 2026-07-06
 
 ### Added
