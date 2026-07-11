@@ -43,9 +43,9 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: "Credit Card Manager",
+  title: "Glidepath — Credit Card Manager",
   description:
-    "Connect your credit cards with Plaid and get a clear picture of balances, transactions, and spending.",
+    "Glidepath by Tekrogen — every card, one ledger, zero surprises. Balances, due dates, 0% promo deadlines, and the right card for every swipe.",
 };
 
 // Viewport configuration for iOS (Next.js 16+ requires separate export)

@@ -1,8 +1,8 @@
 {
-  "name": "credit-card-manager",
+  "name": "glidepath",
   "version": "1.0.0",
   "private": true,
-  "description": "Plaid-powered credit card manager starter kit — Next.js, Prisma, NextAuth, shadcn/ui",
+  "description": "Glidepath — every card, one ledger, zero surprises. Credit-card cockpit by Tekrogen (Next.js, Prisma, NextAuth, shadcn/ui)",
   "engines": {
     "node": ">=22"
   },
