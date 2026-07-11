@@ -1,7 +1,7 @@
 import { test as setup, expect } from '@playwright/test';
 
 import { authFile } from '../../playwright.config';
-import { DEMO_USER } from '../../lib/auth/providers';
+import { DEMO_USER } from '../../src/lib/auth/providers';
 
 /**
  * Auth Setup

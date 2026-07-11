@@ -23,7 +23,7 @@
     "incremental": true,
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
     },
     "plugins": [

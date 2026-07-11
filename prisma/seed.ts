@@ -10,8 +10,8 @@
  */
 
 import { PrismaClient, UserRole, AccountType, TransactionType, BudgetPeriod } from '@prisma/client';
-import { initializeCategories } from '../lib/categories-init';
-import { categorizeTransaction } from '../lib/categories';
+import { initializeCategories } from '../src/lib/categories-init';
+import { categorizeTransaction } from '../src/lib/categories';
 
 const prisma = new PrismaClient();
 
