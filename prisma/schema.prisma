@@ -60,6 +60,7 @@ model User {
   preferences  UserPreferences?
   auditLogs    AuditLog[]
   plaidItems   PlaidItem[]
+  householdMembers HouseholdMember[]
 }
 
 model VerificationToken {
@@ -88,6 +89,7 @@ model UserAccount {
   transactions Transaction[]
 
   @@index([userId])
+  creditCards CreditCard[]
 }
 
 model Transaction {
@@ -187,6 +189,7 @@ model UserPreferences {
   id                   String   @id @default(cuid())
   userId               String   @unique
   theme                String   @default("system")
+  displayCurrency      String   @default("USD") // ISO 4217, for aggregates/UI
   compactMode          Boolean  @default(false)
   emailNotifications   Boolean  @default(true)
   browserNotifications Boolean  @default(false)
@@ -300,4 +303,141 @@ enum Impact {
 enum CategoryType {
   INCOME
   EXPENSE
+}
+
+// ─── Glidepath card domain (Blueprint Level 6, Phase 1) ─────────────────────
+// Money: integer minor units (BigInt cents) + ISO currency (EDR-008).
+// APRs: integer basis points — 2274 = 22.74%.
+// Authorization resolves through household membership (EDR-014).
+
+enum CardLifecycle {
+  ACTIVE
+  FROZEN
+  ARCHIVED
+}
+
+enum CardSyncStatus {
+  MANUAL
+  SYNCED
+  SYNC_PENDING
+  SYNC_FAILED
+  DISCONNECTED
+}
+
+enum CardAttribution {
+  MEMBER
+  SHARED
+}
+
+enum CardType {
+  PERSONAL
+  BUSINESS
+}
+
+enum FieldSource {
+  PLAID
+  MANUAL
+  UNKNOWN
+}
+
+enum PromoStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum HouseholdRole {
+  OWNER
+  MEMBER
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members HouseholdMember[]
+  cards   CreditCard[]
+}
+
+model HouseholdMember {
+  id          String        @id @default(cuid())
+  householdId String
+  displayName String // "Marti", "Bob" — label-only members have no userId
+  userId      String? // set when the member becomes a real login (additive path, EDR-014)
+  role        HouseholdRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  household  Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ownedCards CreditCard[] @relation("CardOwner")
+
+  @@unique([householdId, displayName])
+  @@index([userId])
+}
+
+model CreditCard {
+  id            String          @id @default(cuid())
+  householdId   String
+  ownerMemberId String? // null ⇒ shared household card
+  attribution   CardAttribution @default(SHARED)
+
+  cardName  String
+  lastFour  String? // text: preserves leading zeros; NEVER a key (duplicates exist)
+  issuer    String // display name, e.g. "Chase"
+  issuerKey String? // logo/swatch lookup key
+  network   String?
+  cardType  CardType @default(PERSONAL)
+  currency  String   @default("USD") // ISO 4217 billing currency
+
+  creditLimitMinor     BigInt? // null ⇒ utilization undefined
+  currentBalanceMinor  BigInt  @default(0) // positive amount owed
+  statementBalanceMinor BigInt?
+  regularAprBps        Int? // 2274 = 22.74%
+  statementCloseDay    Int? // 1-31
+  paymentDueDay        Int? // 1-31
+  paymentDueTimeZone   String  @default("America/New_York")
+  minimumPaymentMinor  BigInt?
+  paymentNote          String? // free text by design: "$350/month", "Statement Amt"
+
+  lifecycle    CardLifecycle  @default(ACTIVE)
+  syncStatus   CardSyncStatus @default(MANUAL)
+  lastSyncedAt DateTime?
+
+  // Field provenance → estimated-vs-confirmed UI states
+  limitSource   FieldSource @default(UNKNOWN)
+  aprSource     FieldSource @default(UNKNOWN)
+  minimumSource FieldSource @default(UNKNOWN)
+
+  userAccountId String? // optional aggregator link
+  notes         String? @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  household   Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ownerMember HouseholdMember? @relation("CardOwner", fields: [ownerMemberId], references: [id], onDelete: SetNull)
+  userAccount UserAccount?     @relation(fields: [userAccountId], references: [id], onDelete: SetNull)
+  promoPeriods PromoPeriod[]
+
+  @@index([householdId])
+}
+
+// Inside the CreditCard aggregate — edited with the card (EDR-017).
+model PromoPeriod {
+  id                    String      @id @default(cuid())
+  cardId                String
+  promoAprBps           Int         @default(0)
+  regularAprBpsAfter    Int?
+  startsOn              DateTime?   @db.Date
+  endsOn                DateTime    @db.Date
+  shelteredBalanceMinor BigInt      @default(0)
+  status                PromoStatus @default(ACTIVE)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
 }

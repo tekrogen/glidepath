@@ -12,6 +12,7 @@
 import { PrismaClient, UserRole, AccountType, TransactionType, BudgetPeriod } from '@prisma/client';
 import { initializeCategories } from '../src/lib/categories-init';
 import { categorizeTransaction } from '../src/lib/categories';
+import { SEED_CARDS, SEED_HOUSEHOLD, SEED_VERSION } from './seed-data/glidepath-cards';
 
 const prisma = new PrismaClient();
 
@@ -332,6 +333,66 @@ async function main() {
   }
 
   console.log(`Seed complete: ${created} transactions upserted for ${DEMO_EMAIL}`);
+
+  // 7. Glidepath card domain — the Hi-Fi dataset (SEED_VERSION 2, EDR-018).
+  //    Idempotent: the household's cards are wiped and recreated each run.
+  const household = await prisma.household.upsert({
+    where: { id: 'seed-household-glidepath' },
+    update: {},
+    create: { id: 'seed-household-glidepath', name: SEED_HOUSEHOLD.name },
+  });
+  const membersByName = new Map<string, string>();
+  for (const m of SEED_HOUSEHOLD.members) {
+    const member = await prisma.householdMember.upsert({
+      where: { householdId_displayName: { householdId: household.id, displayName: m.displayName } },
+      update: { userId: m.isDemoUser ? user.id : null, role: m.role },
+      create: {
+        householdId: household.id,
+        displayName: m.displayName,
+        role: m.role,
+        userId: m.isDemoUser ? user.id : null,
+      },
+    });
+    membersByName.set(m.displayName, member.id);
+  }
+  await prisma.creditCard.deleteMany({ where: { householdId: household.id } });
+  for (const c of SEED_CARDS) {
+    await prisma.creditCard.create({
+      data: {
+        householdId: household.id,
+        ownerMemberId: c.owner ? membersByName.get(c.owner) : null,
+        attribution: c.owner ? 'MEMBER' : 'SHARED',
+        cardName: c.cardName,
+        lastFour: c.lastFour,
+        issuer: c.issuer,
+        issuerKey: c.issuerKey,
+        cardType: c.cardType,
+        creditLimitMinor: c.creditLimitMinor,
+        currentBalanceMinor: c.currentBalanceMinor,
+        regularAprBps: c.regularAprBps,
+        paymentDueDay: c.paymentDueDay,
+        minimumPaymentMinor: c.minimumPaymentMinor,
+        limitSource: c.creditLimitMinor != null ? 'MANUAL' : 'UNKNOWN',
+        aprSource: c.regularAprBps != null || c.promo != null ? 'MANUAL' : 'UNKNOWN',
+        minimumSource: c.minimumPaymentMinor != null ? 'MANUAL' : 'UNKNOWN',
+        notes: c.notes,
+        promoPeriods: c.promo
+          ? {
+              create: {
+                promoAprBps: 0,
+                regularAprBpsAfter: c.promo.regularAprBpsAfter,
+                endsOn: new Date(`${c.promo.endsOn}T00:00:00Z`),
+                shelteredBalanceMinor: c.currentBalanceMinor,
+                status: 'ACTIVE',
+              },
+            }
+          : undefined,
+      },
+    });
+  }
+  console.log(
+    `Glidepath cards seeded: ${SEED_CARDS.length} cards in "${SEED_HOUSEHOLD.name}" (seed version ${SEED_VERSION})`
+  );
 }
 
 main()
