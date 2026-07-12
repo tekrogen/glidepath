@@ -6,11 +6,19 @@
  * tabular-nums). Status badges come precomputed from the canonical engine
  * (never re-derived here — EDR-003).
  */
-import { useMemo, useState } from "react"
+import { useMemo, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { EstimatedValue } from "@/components/ui/estimated-value"
+import { DUE_SOON_DAYS, resolveStatusBadge, type Alert, type Lifecycle } from "@/features/cards"
+import { freezeCard } from "@/features/cards/actions/freeze-card"
+import { unfreezeCard } from "@/features/cards/actions/unfreeze-card"
 import { formatMinor, formatPercent } from "@/lib/formatting"
 
 export interface CardsTableRow {
@@ -20,7 +28,13 @@ export interface CardsTableRow {
   issuerKey: string | null
   issuer: string
   ownerLabel: string | null
-  statusBadge: string
+  /** Lifecycle + alert are carried raw so the displayed badge derives through
+   *  the one status engine (resolveStatusBadge) — this is what makes the
+   *  optimistic freeze AND unfreeze correct (EDR-003). */
+  lifecycle: Lifecycle
+  alert: Alert
+  /** Days until the next payment due date; drives the freeze-confirm warning. */
+  dueInDays: number | null
   utilization: number | null
   balanceCents: number
   limitCents: number | null
@@ -98,6 +112,129 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
+/**
+ * Per-row freeze/unfreeze control (issue #27). A ghost trigger opens a
+ * Popover confirm carrying the EDR-007 disclosure (in-app tracking only)
+ * and a due-payment warning. Confirming sets an optimistic lifecycle
+ * override (instant badge flip via the one status engine), calls the
+ * mutation, and — on success — shows an Undo toast + refreshes so server
+ * truth reconciles the override. On failure it reverts and toasts the error.
+ */
+function FreezeControl({
+  row,
+  lifecycle,
+  setOverride,
+}: {
+  row: CardsTableRow
+  /** Effective lifecycle (override ?? server) — decides the verb + confirm. */
+  lifecycle: Lifecycle
+  setOverride: (id: string, next: Lifecycle) => void
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  const frozen = lifecycle === "FROZEN"
+  const verb = frozen ? "Unfreeze" : "Freeze"
+  const identity = row.lastFour ? `${row.cardName} ····${row.lastFour}` : row.cardName
+  const showDueWarning =
+    !frozen && row.dueInDays != null && row.dueInDays >= 0 && row.dueInDays <= DUE_SOON_DAYS
+
+  const run = (nextFrozen: boolean) => {
+    const next: Lifecycle = nextFrozen ? "FROZEN" : "ACTIVE"
+    const prev: Lifecycle = nextFrozen ? "ACTIVE" : "FROZEN"
+    startTransition(async () => {
+      setOverride(row.id, next)
+      const res = await (nextFrozen ? freezeCard(row.id) : unfreezeCard(row.id))
+      if (!res.success) {
+        setOverride(row.id, prev)
+        toast.error(res.message)
+        return
+      }
+      toast.success(res.message, {
+        action: {
+          label: "Undo",
+          onClick: () =>
+            startTransition(async () => {
+              setOverride(row.id, prev)
+              const undo = await (nextFrozen ? unfreezeCard(row.id) : freezeCard(row.id))
+              if (!undo.success) {
+                setOverride(row.id, next)
+                toast.error(undo.message)
+                return
+              }
+              router.refresh()
+            }),
+        },
+      })
+      router.refresh()
+    })
+  }
+
+  const onConfirm = () => {
+    setOpen(false)
+    run(!frozen)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={isPending}
+          aria-label={`${verb} ${identity}`}
+        >
+          {verb}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 space-y-3 text-sm">
+        <p className="font-medium">
+          {verb} {row.cardName}
+          {row.lastFour ? ` ····${row.lastFour}` : ""}?
+        </p>
+        {frozen ? (
+          <p className="text-muted-foreground">
+            This clears the frozen mark in Glidepath. It doesn&apos;t contact your issuer or change
+            anything with your bank.
+          </p>
+        ) : (
+          <p className="text-muted-foreground">
+            This marks the card as frozen in Glidepath to help you track it. It doesn&apos;t contact
+            your issuer or stop charges — freeze with your bank for that.
+          </p>
+        )}
+        {showDueWarning && (
+          <p className="rounded-md border border-warning/50 bg-warning/10 px-2 py-1.5 text-xs text-warning">
+            Payment due in {row.dueInDays} {row.dueInDays === 1 ? "day" : "days"} — freezing
+            won&apos;t change that.
+            {row.minPayCents != null && (
+              <>
+                {" "}
+                Minimum{" "}
+                {row.hasEstimatedInputs ? (
+                  <EstimatedValue>{formatMinor(row.minPayCents)}</EstimatedValue>
+                ) : (
+                  formatMinor(row.minPayCents)
+                )}
+                .
+              </>
+            )}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={onConfirm} disabled={isPending}>
+            {verb}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function SortHeader({
   label,
   columnKey,
@@ -137,6 +274,21 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
   const [sortKey, setSortKey] = useState<SortKey>("utilization")
   const [sortDesc, setSortDesc] = useState(true)
   const [page, setPage] = useState(0)
+
+  // Optimistic lifecycle per card id. A fresh `rows` prop means the RSC
+  // refetched (router.refresh / navigation) and server truth now reflects
+  // the mutation, so overrides are dropped and the derived badge reads from
+  // server data — no flash, since truth already matches the override. Reset
+  // during render (React's documented prop-change adjustment) rather than in
+  // an effect, so the stale override never paints for a frame.
+  const [lifecycleOverrides, setLifecycleOverrides] = useState<Record<string, Lifecycle>>({})
+  const [prevRows, setPrevRows] = useState(rows)
+  if (rows !== prevRows) {
+    setPrevRows(rows)
+    setLifecycleOverrides({})
+  }
+  const setOverride = (id: string, next: Lifecycle) =>
+    setLifecycleOverrides((o) => ({ ...o, [id]: next }))
 
   const sorted = useMemo(() => {
     const copy = [...rows]
@@ -186,11 +338,15 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
               <th className="px-4 py-3 text-left text-xs font-medium tracking-wide uppercase text-muted-foreground">
                 Status
               </th>
+              <th className="px-4 py-3 text-right text-xs font-medium tracking-wide uppercase text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {paged.map((r) => {
               const high = r.utilization != null && r.utilization >= 0.3
+              const effectiveLifecycle = lifecycleOverrides[r.id] ?? r.lifecycle
               return (
                 <tr key={r.id} className="hover:bg-muted/50" data-testid="card-row">
                   <td className="px-4 py-3">
@@ -256,7 +412,14 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
                     {r.minPayCents == null ? "—" : formatMinor(r.minPayCents)}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={r.statusBadge} />
+                    <StatusBadge status={resolveStatusBadge(effectiveLifecycle, r.alert)} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <FreezeControl
+                      row={r}
+                      lifecycle={effectiveLifecycle}
+                      setOverride={setOverride}
+                    />
                   </td>
                 </tr>
               )
