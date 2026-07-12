@@ -142,3 +142,25 @@ production, switch to real migrations:
 pnpm db:migrate       # creates prisma/migrations/... from schema changes
 npx prisma migrate deploy   # in CI/production
 ```
+
+
+## Testing on your phone (LAN)
+
+`NEXTAUTH_URL` in `.env` points at `localhost` (or `https://localhost` for
+`dev:https`), so opening the app from another device via your machine's LAN IP
+breaks sign-in: NextAuth issues cookies and redirects for the configured URL,
+not the one your phone used — the failure is silent.
+
+Use the LAN dev mode instead:
+
+```bash
+pnpm dev:lan
+```
+
+It detects your LAN IP, binds the server to all interfaces, and overrides
+`NEXTAUTH_URL` to `http://<your-ip>:6014` for that run. Open the printed URL
+on your phone and sign in with the demo credentials.
+
+**Google/GitHub OAuth do not work over LAN IPs** — providers only redirect to
+hosts registered in their consoles (`http://localhost:6014` is what's
+registered). On a phone, use the demo credentials.

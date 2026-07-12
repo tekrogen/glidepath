@@ -51,3 +51,25 @@ test.describe("Cards page", () => {
     await expect(page.getByText(/····7727/).first()).toBeVisible()
   })
 })
+
+test.describe("Sign-in error feedback (issue #11)", () => {
+  // Runs unauthenticated on purpose: a fresh context hits the signin page.
+  test.use({ storageState: { cookies: [], origins: [] } })
+
+  test("wrong password shows an inline error instead of failing silently", async ({ page }) => {
+    await page.goto("/signin")
+    await page.getByLabel("Email").fill("demo@creditcardmanager.app")
+    await page.getByLabel("Password").fill("wrong-password")
+    await page.getByRole("button", { name: "Sign in" }).click()
+    await expect(page.getByText(/sign-in failed|invalid|incorrect|try again/i).first()).toBeVisible()
+    await expect(page).toHaveURL(/signin/) // no silent redirect
+  })
+
+  test("demo autofill + submit reaches the dashboard", async ({ page }) => {
+    await page.goto("/signin")
+    await page.getByText("Fill in demo credentials").click()
+    await expect(page.getByLabel("Email")).toHaveValue("demo@creditcardmanager.app")
+    await page.getByRole("button", { name: "Sign in" }).click()
+    await page.waitForURL(/dashboard|overview/)
+  })
+})

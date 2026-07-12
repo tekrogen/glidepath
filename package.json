@@ -25,7 +25,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:install": "playwright install chromium",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:lan": "node scripts/dev-lan.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

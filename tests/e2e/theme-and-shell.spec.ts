@@ -70,12 +70,13 @@ test.describe("Shell architecture (mockup IA)", () => {
     const labels = await nav
       .locator("a, span[aria-disabled]")
       .evaluateAll((els) => els.map((e) => e.textContent?.replace(/Soon$/, "").trim()))
-    expect(labels.slice(0, 5)).toEqual([
+    expect(labels.slice(0, 6)).toEqual([
       "Overview",
       "Cards",
-      "Payment Runway",
-      "Swipe Matrix",
-      "Wallet",
+      "Transactions",
+      "Payments",
+      "Rewards",
+      "Insights",
     ])
     expect(labels).toContain("Transactions")
     expect(labels).toContain("Settings")
@@ -85,7 +86,7 @@ test.describe("Shell architecture (mockup IA)", () => {
     await page.goto("/overview")
     await expect(page.getByText("Glidepath")).toBeVisible()
     await expect(page.getByText("Credit Card Manager", { exact: true })).toBeVisible()
-    const runway = page.getByTestId("primary-nav").getByText("Payment Runway")
+    const runway = page.getByTestId("primary-nav").locator("span[aria-disabled]", { hasText: "Payments" })
     await expect(runway).toBeVisible()
     expect(await runway.evaluate((el) => el.closest("a") != null)).toBe(false)
   })

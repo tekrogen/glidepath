@@ -8,6 +8,7 @@
  */
 
 import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 
@@ -33,9 +34,11 @@ interface SignInFormProps {
 }
 
 export function SignInForm({ callbackUrl, error, providers }: SignInFormProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState<"google" | "github" | "demo" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const hasOAuth = providers.google || providers.github;
 
@@ -51,13 +54,28 @@ export function SignInForm({ callbackUrl, error, providers }: SignInFormProps) {
   const handleDemoSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading("demo");
+    setFormError(null);
     try {
-      await signIn("demo-credentials", {
+      // redirect: false — failures surface inline instead of navigating to a
+      // NEXTAUTH_URL-derived error page, which is unreachable when testing
+      // from another device on the LAN (issue #11).
+      const result = await signIn("demo-credentials", {
         email,
         password,
-        callbackUrl,
+        redirect: false,
       });
+      if (result?.error) {
+        setFormError(getAuthErrorMessage(result.error) ?? "Sign-in failed. Check your email and password.");
+        setIsLoading(null);
+      } else if (result?.ok) {
+        router.push(callbackUrl);
+        router.refresh();
+      } else {
+        setFormError("Sign-in failed. Please try again.");
+        setIsLoading(null);
+      }
     } catch {
+      setFormError("Sign-in failed. Please try again.");
       setIsLoading(null);
     }
   };
@@ -67,7 +85,7 @@ export function SignInForm({ callbackUrl, error, providers }: SignInFormProps) {
     setPassword(DEMO_PASSWORD);
   };
 
-  const errorMessage = getAuthErrorMessage(error);
+  const errorMessage = formError ?? getAuthErrorMessage(error);
 
   return (
     <Card className="border-border shadow-sm">

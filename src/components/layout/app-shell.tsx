@@ -76,6 +76,18 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
           <NavItem key={link.label} link={link} active={isActive(link.href)} onNavigate={onNavigate} />
         ))}
       </nav>
+      <div className="border-t border-border px-3 py-3">
+        <span
+          className="flex w-full cursor-default items-center justify-center gap-2 rounded-md border border-primary/40 px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-primary/60"
+          aria-disabled
+          title="Add card arrives with the onboarding flow (Phase 2)"
+        >
+          + Add Card
+          <span className="rounded border border-border px-1 py-px text-[9px] text-muted-foreground/70">
+            Soon
+          </span>
+        </span>
+      </div>
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           Appearance
