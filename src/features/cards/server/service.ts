@@ -31,6 +31,7 @@ import {
   findHouseholdCards,
   findHouseholdIdForUser,
   findOrCreateHouseholdForUser,
+  setCardLifecycle,
   type CardRow,
 } from "./repository"
 
@@ -51,6 +52,9 @@ export interface PortfolioCard {
   utilization: number | null
   paydownPriority: number | null
   paymentDueDay: number | null
+  /** Days until the next payment due date; null when no due day is known.
+   *  Single-sourced from the alert engine's own input — no new math. */
+  dueInDays: number | null
   /** Finance shape for calculators / client-side what-if. */
   finance: FinanceCard
   /** Provenance: true when a displayed derived figure rests on unconfirmed inputs. */
@@ -72,10 +76,11 @@ function toPortfolioCard(
   today: Date
 ): PortfolioCard {
   const finance = toFinanceCard(row)
+  const daysUntilDue = dueInDays(row.paymentDueDay, today)
   const alert = resolveAlert(
     {
       ...finance,
-      dueInDays: dueInDays(row.paymentDueDay, today),
+      dueInDays: daysUntilDue,
       // Autopay/scheduled-payment coverage arrives in Phase 3 — until then a
       // known due day within the window alerts unless the card is frozen.
       dueCovered: false,
@@ -96,6 +101,7 @@ function toPortfolioCard(
     utilization: utilization(finance.balanceMinor, finance.limitMinor),
     paydownPriority: priorities.get(row.id) ?? null,
     paymentDueDay: row.paymentDueDay,
+    dueInDays: daysUntilDue,
     finance,
     hasEstimatedInputs:
       row.aprSource === "UNKNOWN" || row.limitSource === "UNKNOWN" || row.minimumSource === "UNKNOWN",
@@ -124,6 +130,33 @@ export async function createCardForUser(
     cardName: input.cardName,
   })
   return { cardId: card.id }
+}
+
+/**
+ * Freeze or unfreeze a card (issue #27) — an in-app tracking state only
+ * (EDR-007); it never contacts the issuer. The household is looked up, NOT
+ * created (the target card must already exist); a cross-household or missing
+ * id updates zero rows and throws, which the action maps to a failure result.
+ * The mutation is audited through the events seam.
+ */
+export async function setCardFrozenForUser(
+  userId: string,
+  cardId: string,
+  frozen: boolean
+): Promise<{ frozen: boolean }> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) throw new Error("Not authorized")
+  const lifecycle = frozen ? "FROZEN" : "ACTIVE"
+  const { updated, cardName } = await setCardLifecycle(householdId, cardId, lifecycle)
+  if (updated === 0) throw new Error("Not authorized")
+  await emitDomainEvent({
+    type: frozen ? "CardFrozen" : "CardUnfrozen",
+    userId,
+    householdId,
+    cardId,
+    cardName: cardName ?? "Card",
+  })
+  return { frozen }
 }
 
 /** The full portfolio for a user's household; empty portfolio when none. */

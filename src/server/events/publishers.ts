@@ -10,6 +10,8 @@ import type { DomainEvent } from "./types"
 
 const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   CardAdded: "CARD_ADDED",
+  CardFrozen: "CARD_FROZEN",
+  CardUnfrozen: "CARD_UNFROZEN",
 }
 
 async function writeAuditLog(event: DomainEvent): Promise<void> {

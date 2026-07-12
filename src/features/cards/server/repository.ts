@@ -71,6 +71,31 @@ export async function createCard(householdId: string, data: CreateCardData) {
   })
 }
 
+/**
+ * Set a card's lifecycle within the caller's household (issue #27). The
+ * householdId in the WHERE is the authz gate: a card outside the caller's
+ * household matches zero rows → updated === 0, indistinguishable from a
+ * missing id (the correct authz posture, and no separate existence read =
+ * no TOCTOU). Returns the card name for the audit event.
+ */
+export async function setCardLifecycle(
+  householdId: string,
+  cardId: string,
+  lifecycle: "ACTIVE" | "FROZEN"
+): Promise<{ updated: number; cardName: string | null }> {
+  const result = await prisma.creditCard.updateMany({
+    where: { id: cardId, householdId },
+    data: { lifecycle },
+  })
+  const card = result.count
+    ? await prisma.creditCard.findFirst({
+        where: { id: cardId, householdId },
+        select: { cardName: true },
+      })
+    : null
+  return { updated: result.count, cardName: card?.cardName ?? null }
+}
+
 export async function findHouseholdCards(householdId: string, includeArchived = false) {
   return prisma.creditCard.findMany({
     where: {

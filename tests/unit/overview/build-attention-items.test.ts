@@ -27,6 +27,7 @@ const card = (over: CardOverrides): PortfolioCard => ({
   utilization: null,
   paydownPriority: null,
   paymentDueDay: null,
+  dueInDays: null,
   hasEstimatedInputs: false,
   ...over,
   finance: {
