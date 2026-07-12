@@ -8,7 +8,7 @@
  */
 import { z } from "zod"
 
-import { parseDollarsToMinor, percentToBps } from "@/lib/finance"
+import { MAX_AMOUNT_MINOR, parseDollarsToMinor, percentToBps } from "@/lib/finance"
 
 /** "" → null; else must be a valid dollar amount within the given bounds. */
 function dollarsField(label: string, opts: { positive?: boolean } = {}) {
@@ -21,6 +21,13 @@ function dollarsField(label: string, opts: { positive?: boolean } = {}) {
       const minor = parseDollarsToMinor(v)
       if (minor == null) {
         ctx.addIssue({ code: "custom", message: `Enter ${label} as a dollar amount, like 1250.00.` })
+        return z.NEVER
+      }
+      if (minor > MAX_AMOUNT_MINOR) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${label[0].toUpperCase()}${label.slice(1)} must be $99,999,999.99 or less.`,
+        })
         return z.NEVER
       }
       if (opts.positive && minor <= 0n) {

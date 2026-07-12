@@ -24,16 +24,15 @@ import { dueInDays } from "@/features/cards/utils/due-dates"
 import type { CreateCardInput } from "@/features/cards/schemas/create-card-schema"
 import { emitDomainEvent } from "@/server/events/publishers"
 
+import { toCreateCardData } from "./create-card-data"
 import { toFinanceCard } from "./mappers"
 import {
   createCard,
-  createHouseholdWithOwner,
   findHouseholdCards,
   findHouseholdIdForUser,
-  findUserProfile,
+  findOrCreateHouseholdForUser,
   type CardRow,
 } from "./repository"
-import { issuerKeyFor } from "./tracker-import"
 
 export interface PortfolioCard {
   id: string
@@ -103,58 +102,20 @@ function toPortfolioCard(
   }
 }
 
-/** Get-or-create the user's household so zero-card users are functional (issue #26). */
-async function resolveHouseholdIdForUser(userId: string): Promise<string> {
-  const existing = await findHouseholdIdForUser(userId)
-  if (existing) return existing
-  const profile = await findUserProfile(userId)
-  const firstName = profile?.name?.trim().split(/\s+/)[0] || null
-  const displayName = firstName ?? profile?.email?.split("@")[0] ?? "Owner"
-  const householdName = firstName ? `${firstName}'s Household` : "My Household"
-  const household = await createHouseholdWithOwner(userId, householdName, displayName)
-  return household.id
-}
-
 /**
  * Create a card from validated form input — the app's first CreditCard
- * mutation. Mapping follows the seed/import promo convention exactly:
- * an active promo moves the card-level APR onto the PromoPeriod
- * (regularAprBpsAfter) and shelters the current balance; provenance is
- * presence-based (MANUAL when the user supplied a value, else UNKNOWN).
+ * mutation. The input → row mapping (promo + provenance conventions) is
+ * the pure, unit-tested toCreateCardData; the household is get-or-created
+ * so zero-card users are functional. The zero-membership branch itself is
+ * exercised by the deriveHouseholdIdentity unit tests + manual QA — the
+ * e2e demo user always has a seeded membership.
  */
 export async function createCardForUser(
   userId: string,
   input: CreateCardInput
 ): Promise<{ cardId: string }> {
-  const householdId = await resolveHouseholdIdForUser(userId)
-  // The schema guarantees promoEndsOn when hasPromo — this narrows the type.
-  const promoActive = input.hasPromo && input.promoEndsOn != null
-  const card = await createCard(householdId, {
-    cardName: input.cardName,
-    lastFour: input.lastFour,
-    issuer: input.issuer,
-    issuerKey: issuerKeyFor(input.issuer),
-    creditLimitMinor: input.creditLimitMinor,
-    currentBalanceMinor: input.currentBalanceMinor,
-    // While a promo is active the card-level APR is null; the post-promo
-    // rate lives on the PromoPeriod (schema convention, Level 6).
-    regularAprBps: promoActive ? null : input.regularAprBps,
-    paymentDueDay: input.paymentDueDay,
-    statementCloseDay: input.statementCloseDay,
-    minimumPaymentMinor: input.minimumPaymentMinor,
-    paymentNote: input.paymentNote,
-    notes: input.notes,
-    limitSource: input.creditLimitMinor != null ? "MANUAL" : "UNKNOWN",
-    aprSource: input.regularAprBps != null || promoActive ? "MANUAL" : "UNKNOWN",
-    minimumSource: input.minimumPaymentMinor != null ? "MANUAL" : "UNKNOWN",
-    promo: promoActive
-      ? {
-          endsOn: input.promoEndsOn!,
-          regularAprBpsAfter: input.regularAprBps,
-          shelteredBalanceMinor: input.currentBalanceMinor,
-        }
-      : null,
-  })
+  const householdId = await findOrCreateHouseholdForUser(userId)
+  const card = await createCard(householdId, toCreateCardData(input))
   await emitDomainEvent({
     type: "CardAdded",
     userId,

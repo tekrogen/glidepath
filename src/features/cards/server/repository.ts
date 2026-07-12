@@ -6,6 +6,8 @@
  */
 import { prisma } from "@/lib/db/prisma"
 
+import { deriveHouseholdIdentity, type CreateCardData } from "./create-card-data"
+
 export type CardRow = NonNullable<Awaited<ReturnType<typeof findHouseholdCards>>>[number]
 
 export async function findHouseholdIdForUser(userId: string): Promise<string | null> {
@@ -16,50 +18,35 @@ export async function findHouseholdIdForUser(userId: string): Promise<string | n
   return member?.householdId ?? null
 }
 
-export async function findUserProfile(userId: string) {
-  return prisma.user.findUnique({
-    where: { id: userId },
-    select: { name: true, email: true },
+/**
+ * The user's household id, creating "<First>'s Household" + OWNER member
+ * on first use so zero-card users are functional (issue #26). Find and
+ * create share one transaction to narrow the duplicate-household window;
+ * the residual race (two concurrent FIRST mutations for one user) is
+ * accepted — this is a single-user product and the form disables submit
+ * while pending.
+ */
+export async function findOrCreateHouseholdForUser(userId: string): Promise<string> {
+  return prisma.$transaction(async (tx) => {
+    const member = await tx.householdMember.findFirst({
+      where: { userId },
+      select: { householdId: true },
+    })
+    if (member) return member.householdId
+    const profile = await tx.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    })
+    const { householdName, displayName } = deriveHouseholdIdentity(profile)
+    const household = await tx.household.create({
+      data: {
+        name: householdName,
+        members: { create: { displayName, userId, role: "OWNER" } },
+      },
+      select: { id: true },
+    })
+    return household.id
   })
-}
-
-/** Household + its OWNER member (linked to the user) in one nested create. */
-export async function createHouseholdWithOwner(
-  userId: string,
-  householdName: string,
-  displayName: string
-) {
-  return prisma.household.create({
-    data: {
-      name: householdName,
-      members: { create: { displayName, userId, role: "OWNER" } },
-    },
-    select: { id: true },
-  })
-}
-
-/** Ready-to-write card shape — the service owns the domain mapping. */
-export interface CreateCardData {
-  cardName: string
-  lastFour: string | null
-  issuer: string
-  issuerKey: string | null
-  creditLimitMinor: bigint | null
-  currentBalanceMinor: bigint
-  regularAprBps: number | null
-  paymentDueDay: number | null
-  statementCloseDay: number | null
-  minimumPaymentMinor: bigint | null
-  paymentNote: string | null
-  notes: string | null
-  limitSource: "MANUAL" | "UNKNOWN"
-  aprSource: "MANUAL" | "UNKNOWN"
-  minimumSource: "MANUAL" | "UNKNOWN"
-  promo: {
-    endsOn: Date
-    regularAprBpsAfter: number | null
-    shelteredBalanceMinor: bigint
-  } | null
 }
 
 export async function createCard(householdId: string, data: CreateCardData) {
@@ -68,10 +55,6 @@ export async function createCard(householdId: string, data: CreateCardData) {
     data: {
       householdId,
       ...card,
-      // Owner attribution arrives with household management UI later.
-      ownerMemberId: null,
-      attribution: "SHARED",
-      syncStatus: "MANUAL",
       promoPeriods: promo
         ? {
             create: {
