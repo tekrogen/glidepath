@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['authenticated'],
-      testMatch: /add-card\.spec\.ts/,
+      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts/,
     },
   ],
 

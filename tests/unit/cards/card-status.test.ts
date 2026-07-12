@@ -1,7 +1,20 @@
 /** Status-engine conformance (Blueprint EDR-003 — badge resolution is locked). */
 import { describe, expect, it } from "vitest"
 
-import { resolveAlert, resolveStatusBadge, type AlertInput } from "@/features/cards/utils/card-status"
+import {
+  resolveAlert,
+  resolveStatusBadge,
+  type Alert,
+  type AlertInput,
+} from "@/features/cards/utils/card-status"
+
+const ALL_ALERTS: Alert[] = [
+  "PROMO_EXPIRED",
+  "PROMO_ENDING_SOON",
+  "HIGH_UTILIZATION",
+  "DUE_SOON",
+  "OK",
+]
 
 const TODAY = new Date(Date.UTC(2026, 6, 11))
 
@@ -36,5 +49,24 @@ describe("badge resolution (EMP#2067 §4 worked example)", () => {
     expect(resolveStatusBadge("ARCHIVED", "OK")).toBe("ARCHIVED")
     expect(resolveStatusBadge("ACTIVE", "HIGH_UTILIZATION")).toBe("HIGH_UTILIZATION")
     expect(resolveStatusBadge("ACTIVE", "OK")).toBe("OK")
+  })
+})
+
+/**
+ * The freeze/unfreeze row control (issue #27) renders no badge of its own —
+ * it flips the lifecycle and lets resolveStatusBadge decide. This guards
+ * that reconciliation: optimistic FROZEN always shows "FROZEN", and
+ * unfreezing (back to ACTIVE) always restores the card's live alert.
+ */
+describe("freeze display invariant (issue #27 optimistic derivation)", () => {
+  it("FROZEN masks every alert as the FROZEN badge", () => {
+    for (const alert of ALL_ALERTS) {
+      expect(resolveStatusBadge("FROZEN", alert)).toBe("FROZEN")
+    }
+  })
+  it("ACTIVE (post-unfreeze) reverts to the underlying alert", () => {
+    for (const alert of ALL_ALERTS) {
+      expect(resolveStatusBadge("ACTIVE", alert)).toBe(alert)
+    }
   })
 })
