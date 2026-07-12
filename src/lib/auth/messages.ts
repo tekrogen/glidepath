@@ -33,3 +33,25 @@ export function getAuthErrorMessage(errorCode: string | null | undefined): strin
   if (!errorCode) return null;
   return AUTH_ERROR_MESSAGES[errorCode] ?? AUTH_ERROR_MESSAGES.Default ?? null;
 }
+
+/**
+ * OAuth host-mismatch detection (issue #15): Google/GitHub only redirect to
+ * hosts registered in their consoles (derived from NEXTAUTH_URL). When the
+ * request arrives on a different host — e.g. a phone on the LAN — the OAuth
+ * flow can never complete, so the sign-in page shows a hint instead of
+ * letting the buttons fail silently.
+ *
+ * Returns the registered host when the request host differs, else null.
+ */
+export function oauthMismatchHost(
+  requestHost: string | null | undefined,
+  nextauthUrl: string | null | undefined
+): string | null {
+  if (!requestHost || !nextauthUrl) return null;
+  try {
+    const registered = new URL(nextauthUrl).host;
+    return registered.toLowerCase() === requestHost.trim().toLowerCase() ? null : registered;
+  } catch {
+    return null;
+  }
+}

@@ -7,11 +7,13 @@
  */
 
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { Logo } from "@/components/ui/logo";
 import { SignInForm } from "@/components/auth/signin-form";
+import { oauthMismatchHost } from "@/lib/auth/messages";
 
 export default async function SignInPage({
   searchParams,
@@ -31,6 +33,11 @@ export default async function SignInPage({
     demo: process.env.ENABLE_DEMO_AUTH === "true",
   };
 
+  // OAuth providers only redirect to the registered host (issue #15) —
+  // warn instead of letting the buttons fail silently on LAN/other hosts.
+  const requestHost = (await headers()).get("host");
+  const registeredHost = oauthMismatchHost(requestHost, process.env.NEXTAUTH_URL);
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="container mx-auto flex items-center px-6 py-4">
@@ -48,7 +55,12 @@ export default async function SignInPage({
             </p>
           </div>
 
-          <SignInForm callbackUrl={callbackUrl} error={error} providers={providers} />
+          <SignInForm
+          callbackUrl={callbackUrl}
+          error={error}
+          providers={providers}
+          oauthMismatchHost={registeredHost}
+        />
 
           <div className="mt-4 text-center">
             <Link
