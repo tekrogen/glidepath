@@ -5,6 +5,7 @@
  * visible path (EDR-005/EDR-022); linking an institution is the gated
  * secondary block that hands off to the existing /connect-account flow.
  */
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Landmark } from "lucide-react"
 
@@ -27,15 +28,24 @@ export function AddCardSheet({
   onOpenChange: (open: boolean) => void
 }) {
   const router = useRouter()
+  const [pending, setPending] = useState(false)
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        // A monetary mutation is in flight: Escape/overlay-close would
+        // silently discard a server-confirmed outcome. Ignore until settle.
+        if (!next && pending) return
+        onOpenChange(next)
+      }}
+    >
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Add card</SheetTitle>
           <SheetDescription>Track a card manually, or link an institution.</SheetDescription>
         </SheetHeader>
         <div className="mt-6">
-          <AddCardForm onDone={() => onOpenChange(false)} />
+          <AddCardForm onDone={() => onOpenChange(false)} onPendingChange={setPending} />
         </div>
         <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-border p-4">
           <div className="flex items-start gap-3">
