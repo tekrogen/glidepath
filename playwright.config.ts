@@ -45,7 +45,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testMatch: /dashboard\.spec\.ts|settings-redirect\.spec\.ts|api-routes\.spec\.ts|glidepath-pages\.spec\.ts|theme-and-shell\.spec\.ts|notifications\.spec\.ts/,
+      testMatch: /settings-redirect\.spec\.ts|api-routes\.spec\.ts|glidepath-pages\.spec\.ts|theme-and-shell\.spec\.ts|notifications\.spec\.ts/,
     },
 
     // Mutation specs insert real rows, so they run strictly AFTER the

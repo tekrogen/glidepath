@@ -69,7 +69,6 @@ export async function createBudget(formData: FormData) {
   });
 
   revalidatePath("/budgets");
-  revalidatePath("/dashboard");
 }
 
 export async function updateBudget(formData: FormData) {
@@ -97,7 +96,6 @@ export async function updateBudget(formData: FormData) {
   });
 
   revalidatePath("/budgets");
-  revalidatePath("/dashboard");
 }
 
 export async function deleteBudget(formData: FormData) {
@@ -112,5 +110,4 @@ export async function deleteBudget(formData: FormData) {
   await prisma.budget.delete({ where: { id } });
 
   revalidatePath("/budgets");
-  revalidatePath("/dashboard");
 }
