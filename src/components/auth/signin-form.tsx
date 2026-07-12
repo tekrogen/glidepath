@@ -31,9 +31,11 @@ interface SignInFormProps {
     github: boolean;
     demo: boolean;
   };
+  /** Registered OAuth host when it differs from the request host (issue #15). */
+  oauthMismatchHost?: string | null;
 }
 
-export function SignInForm({ callbackUrl, error, providers }: SignInFormProps) {
+export function SignInForm({ callbackUrl, error, providers, oauthMismatchHost }: SignInFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState<"google" | "github" | "demo" | null>(null);
   const [email, setEmail] = useState("");
@@ -130,6 +132,14 @@ export function SignInForm({ callbackUrl, error, providers }: SignInFormProps) {
               {isLoading === "github" ? "Signing in..." : "Continue with GitHub"}
             </span>
           </Button>
+        )}
+
+        {hasOAuth && oauthMismatchHost && (
+          <p className="text-xs text-muted-foreground" data-testid="oauth-host-hint">
+            Google/GitHub sign-in only works at{" "}
+            <span className="font-medium">{oauthMismatchHost}</span> — from this
+            device, use the demo credentials below.
+          </p>
         )}
 
         {providers.demo && (
