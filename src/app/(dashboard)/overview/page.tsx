@@ -22,8 +22,8 @@ export default async function OverviewPage() {
     redirect("/signin?callbackUrl=/overview")
   }
 
-  const { cards, summary, promoPlans } = await getPortfolioForUser(session.user.id)
-  const attentionItems = buildAttentionItems(cards, new Date())
+  const { cards, summary, promoPlans, asOf } = await getPortfolioForUser(session.user.id)
+  const attentionItems = buildAttentionItems(cards, asOf)
 
   return (
     <div className="space-y-6">

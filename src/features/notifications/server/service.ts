@@ -1,8 +1,11 @@
 /**
  * Notifications service — persists attention items as in-app notifications
- * (issue #25). The sync only inserts: the (userId, dedupeKey) unique key
- * makes re-inserts no-ops, and existing rows are never updated or deleted,
- * so read/dismiss state survives every sync.
+ * (issue #25). Occurrence-lifecycle semantics (F15): the store always holds
+ * exactly the CURRENT attention occurrences with their read/dismiss state.
+ * A re-sync of the same occurrence (same dedupeKey) keeps that state; an
+ * occurrence that resolves or rolls over is deleted — dismissed or not — so
+ * a new episode of the same condition re-notifies, while a dismissal
+ * suppresses the occurrence only for as long as it persists.
  */
 import type { NotificationType } from "@prisma/client"
 import type { AttentionItem } from "@/features/overview/utils/build-attention-items"
@@ -11,8 +14,8 @@ import {
   countUnreadForUser,
   dismiss,
   findRecentForUser,
-  insertNotificationsSkippingDuplicates,
   markRead,
+  replaceCurrentForUser,
 } from "./repository"
 
 /** Plain-serializable — safe to cross the RSC → client boundary (no bigint, no Date). */
@@ -32,7 +35,8 @@ export interface NotificationPanel {
 }
 
 export async function syncAttentionNotifications(userId: string, items: AttentionItem[]): Promise<void> {
-  await insertNotificationsSkippingDuplicates(
+  await replaceCurrentForUser(
+    userId,
     items.map((i) => ({
       userId,
       type: i.type as NotificationType,

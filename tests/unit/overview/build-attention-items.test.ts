@@ -120,6 +120,20 @@ describe("dedupe keys (stable occurrence identity)", () => {
       "SYNC_FAILED:card:sf1",
     ])
   })
+
+  it("DUE_SOON keys roll over to next month's date once the due day passes", () => {
+    const [before] = buildAttentionItems([dueSoon], new Date(Date.UTC(2026, 6, 11)))
+    const [after] = buildAttentionItems([dueSoon], new Date(Date.UTC(2026, 6, 20)))
+    expect(before.dedupeKey).toBe("DUE_SOON:card:due1:2026-07-14")
+    expect(after.dedupeKey).toBe("DUE_SOON:card:due1:2026-08-14")
+  })
+
+  it("promo keys are stable across different todays (per promo period, not per day)", () => {
+    const [a] = buildAttentionItems([ending], new Date(Date.UTC(2026, 6, 11)))
+    const [b] = buildAttentionItems([ending], new Date(Date.UTC(2026, 6, 25)))
+    expect(a.dedupeKey).toBe("PROMO_ENDING_SOON:card:end1:2026-08-01")
+    expect(b.dedupeKey).toBe(a.dedupeKey)
+  })
 })
 
 describe("lifecycle and sync rules", () => {
@@ -144,11 +158,12 @@ describe("lifecycle and sync rules", () => {
 })
 
 describe("body copy", () => {
-  it("estimate figures carry the ~ prefix; card labels never omit the name", () => {
+  it("sheltered balances are recorded actuals — never ~ prefixed (EDR-020 is for estimates only)", () => {
     const items = buildAttentionItems([expired, ending], TODAY)
-    expect(items[0].body).toBe("Expired Promo ····4412 — 0% APR ended Jul 1 '26. ~$1,000.00 sheltered.")
-    expect(items[1].body).toContain("~$500.00 sheltered")
+    expect(items[0].body).toBe("Expired Promo ····4412 — 0% APR ended Jul 1 '26. $1,000.00 sheltered.")
+    expect(items[1].body).toContain("$500.00 sheltered")
     expect(items[1].body).toContain("0% APR ends Aug 1 '26 (21d)")
+    for (const i of items) expect(i.body).not.toContain("~")
   })
 
   it("due-soon bodies carry the concrete date and minimum when known", () => {

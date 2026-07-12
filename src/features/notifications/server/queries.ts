@@ -12,7 +12,7 @@ import { buildAttentionItems } from "@/features/overview"
 import { getNotificationPanel, syncAttentionNotifications } from "./service"
 
 export const getNotificationPanelForUser = cache(async (userId: string) => {
-  const { cards } = await getPortfolioForUser(userId)
-  await syncAttentionNotifications(userId, buildAttentionItems(cards, new Date()))
+  const { cards, asOf } = await getPortfolioForUser(userId)
+  await syncAttentionNotifications(userId, buildAttentionItems(cards, asOf))
   return getNotificationPanel(userId)
 })

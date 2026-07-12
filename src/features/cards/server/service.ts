@@ -52,6 +52,9 @@ export interface CardPortfolio {
   cards: PortfolioCard[]
   summary: PortfolioSummary
   promoPlans: PromoPayoffPlan[]
+  /** The clock every derived figure was computed with — downstream
+   *  consumers (attention builder) must reuse it, never a fresh Date. */
+  asOf: Date
 }
 
 function toPortfolioCard(
@@ -98,6 +101,7 @@ export async function getCardPortfolio(userId: string, today = new Date()): Prom
       cards: [],
       summary: portfolioSummary([], today),
       promoPlans: [],
+      asOf: today,
     }
   }
   const rows = await findHouseholdCards(householdId)
@@ -115,5 +119,6 @@ export async function getCardPortfolio(userId: string, today = new Date()): Prom
     cards,
     summary: portfolioSummary(finance, today),
     promoPlans: promoPayoffPlans(finance, today),
+    asOf: today,
   }
 }

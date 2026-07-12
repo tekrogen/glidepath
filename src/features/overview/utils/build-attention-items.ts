@@ -77,7 +77,8 @@ function alertItem(card: PortfolioCard, today: Date): AttentionItem | null {
         card,
         `:${isoDate(endsOn)}`,
         "0% promo expired",
-        `${label(card)} — 0% APR ended ${formatShortDate(endsOn)}. ~${formatMinor(shelteredBalanceMinor)} sheltered.`
+        // Sheltered balance is a recorded actual — no "~" (EDR-020 is for estimates only).
+        `${label(card)} — 0% APR ended ${formatShortDate(endsOn)}. ${formatMinor(shelteredBalanceMinor)} sheltered.`
       )
     }
     case "PROMO_ENDING_SOON": {
@@ -88,7 +89,7 @@ function alertItem(card: PortfolioCard, today: Date): AttentionItem | null {
         card,
         `:${isoDate(endsOn)}`,
         "0% promo ending soon",
-        `${label(card)} — 0% APR ends ${formatShortDate(endsOn)} (${daysUntil(endsOn, today)}d). ~${formatMinor(shelteredBalanceMinor)} sheltered.`
+        `${label(card)} — 0% APR ends ${formatShortDate(endsOn)} (${daysUntil(endsOn, today)}d). ${formatMinor(shelteredBalanceMinor)} sheltered.`
       )
     }
     case "HIGH_UTILIZATION":
