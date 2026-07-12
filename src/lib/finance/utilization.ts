@@ -17,3 +17,14 @@ export function isHighUtilization(balanceMinor: Minor, limitMinor: Minor | null)
   const u = utilization(balanceMinor, limitMinor)
   return u != null && u >= HIGH_UTILIZATION_THRESHOLD
 }
+
+/**
+ * Classify a utilization fraction for the Overview header chip. Keeps the
+ * threshold rule in lib/finance (never a component): at/above the high
+ * threshold is "high", a known fraction below is "ok", unknown limit is
+ * "unknown". Display rounding still happens only at the UI layer.
+ */
+export function utilizationStatus(fraction: number | null): "ok" | "high" | "unknown" {
+  if (fraction == null) return "unknown"
+  return fraction >= HIGH_UTILIZATION_THRESHOLD ? "high" : "ok"
+}
