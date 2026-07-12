@@ -2,13 +2,12 @@
  * Dashboard Layout
  *
  * Layout for all authenticated interior pages.
- * Provides Navbar + sidebar navigation via DashboardLayout.
+ * Provides the Glidepath sidebar shell (mockup UIUX architecture, EDR-013).
  * No Footer — dashboard pages don't show the marketing footer.
  */
 
 import type { ReactNode } from "react";
-import { Navbar } from "@/components/layout/navbar";
-import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
+import { AppShell } from "@/components/layout/app-shell";
 
 interface DashboardGroupLayoutProps {
   children: ReactNode;
@@ -17,8 +16,7 @@ interface DashboardGroupLayoutProps {
 export default function DashboardGroupLayout({ children }: DashboardGroupLayoutProps) {
   return (
     <>
-      <Navbar />
-      <DashboardLayout>{children}</DashboardLayout>
+      <AppShell>{children}</AppShell>
     </>
   );
 }

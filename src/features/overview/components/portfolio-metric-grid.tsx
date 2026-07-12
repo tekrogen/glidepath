@@ -66,7 +66,7 @@ export function PortfolioMetricGrid({ summary }: { summary: PortfolioSummary }) 
           </div>
           <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-muted">
             <div
-              className={`h-full rounded-full ${utilizationHigh ? "bg-destructive" : "bg-emerald-600"}`}
+              className={`h-full rounded-full ${utilizationHigh ? "bg-destructive" : "bg-success"}`}
               style={{ width: `${Math.min(utilization * 100, 100)}%` }}
             />
             {/* 30% high-utilization threshold tick */}

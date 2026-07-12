@@ -6,6 +6,7 @@
 import { redirect } from "next/navigation"
 
 import { auth } from "@/lib/auth"
+import { formatStampDate } from "@/lib/formatting"
 import { getPortfolioForUser } from "@/features/cards"
 import { PortfolioMetricGrid } from "@/features/overview/components/portfolio-metric-grid"
 import { PaydownPriorityPanel } from "@/features/paydown/components/paydown-priority-panel"
@@ -23,11 +24,15 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
-        <p className="text-muted-foreground">
-          {summary.cardCount} cards · one ledger — balances, utilization, and 0% promo deadlines
-          at a glance
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+            {summary.cardCount} cards · one ledger
+          </p>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Overview</h1>
+        </div>
+        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          {formatStampDate(new Date())} · Manual
         </p>
       </div>
 

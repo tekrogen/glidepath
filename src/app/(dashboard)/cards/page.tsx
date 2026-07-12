@@ -7,7 +7,7 @@ import { redirect } from "next/navigation"
 
 import { auth } from "@/lib/auth"
 import { daysUntil, utilization } from "@/lib/finance"
-import { formatAprBps } from "@/lib/formatting"
+import { formatAprBps, formatStampDate } from "@/lib/formatting"
 import { getPortfolioForUser } from "@/features/cards"
 import { CardsTable, type CardsTableRow } from "@/features/cards/components/cards-table"
 
@@ -49,10 +49,15 @@ export default async function CardsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Cards</h1>
-        <p className="text-muted-foreground">
-          Track limits, utilization, and 0% promo deadlines across {rows.length} cards
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+            Sortable · {rows.length} active
+          </p>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Cards</h1>
+        </div>
+        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          {formatStampDate(new Date())} · Manual
         </p>
       </div>
       <CardsTable rows={rows} />

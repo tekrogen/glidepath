@@ -61,7 +61,7 @@ function StatusBadge({ status }: { status: string }) {
       return <Badge variant="destructive">High Utilization</Badge>
     case "PROMO_EXPIRED":
       return (
-        <Badge variant="outline" className="border-red-700/50 text-red-700 dark:text-red-400">
+        <Badge variant="outline" className="border-destructive/50 text-destructive">
           0% Expired
         </Badge>
       )
@@ -69,7 +69,7 @@ function StatusBadge({ status }: { status: string }) {
       return (
         <Badge
           variant="outline"
-          className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+          className="border-warning/50 bg-warning/10 text-warning"
         >
           0% Ending Soon
         </Badge>
@@ -78,20 +78,20 @@ function StatusBadge({ status }: { status: string }) {
       return (
         <Badge
           variant="outline"
-          className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+          className="border-warning/50 bg-warning/10 text-warning"
         >
           Due Soon
         </Badge>
       )
     case "FROZEN":
       return (
-        <Badge variant="outline" className="border-sky-500/50 text-sky-700 dark:text-sky-400">
+        <Badge variant="outline" className="border-secondary/50 text-secondary">
           Frozen
         </Badge>
       )
     default:
       return (
-        <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+        <Badge variant="outline" className="border-success/40 text-success">
           OK
         </Badge>
       )
@@ -232,7 +232,7 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
                       <span className="flex items-center gap-2">
                         <span className="h-2 w-16 overflow-hidden rounded-full bg-muted">
                           <span
-                            className={`block h-full rounded-full ${high ? "bg-destructive" : "bg-emerald-600"}`}
+                            className={`block h-full rounded-full ${high ? "bg-destructive" : "bg-success"}`}
                             style={{ width: `${Math.min(100, r.utilization * 100)}%` }}
                           />
                         </span>
@@ -244,7 +244,7 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {r.aprIsPromo ? (
-                      <span className="text-emerald-700 dark:text-emerald-400">{r.aprDisplay}</span>
+                      <span className="text-secondary">{r.aprDisplay}</span>
                     ) : (
                       <span className={r.aprDisplay === "—" ? "text-muted-foreground" : ""}>
                         {r.aprDisplay}

@@ -46,7 +46,7 @@ export function PaydownPriorityPanel({ cards }: { cards: PortfolioCard[] }) {
               className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-destructive/10 text-xs font-bold text-red-700 dark:text-red-400">
+                <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-destructive/10 text-xs font-bold text-destructive">
                   {card.paydownPriority}
                 </span>
                 <span className="truncate font-medium">{card.cardName}</span>

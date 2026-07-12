@@ -16,7 +16,7 @@ import type { PortfolioCard } from "@/features/cards/server/service"
 function DaysLeftBadge({ daysLeft }: { daysLeft: number }) {
   if (daysLeft <= 30) {
     return (
-      <Badge variant="outline" className="border-red-700/50 text-red-700 dark:text-red-400">
+      <Badge variant="outline" className="border-destructive/50 text-destructive">
         {daysLeft}d left
       </Badge>
     )
@@ -25,7 +25,7 @@ function DaysLeftBadge({ daysLeft }: { daysLeft: number }) {
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+        className="border-warning/50 bg-warning/10 text-warning"
       >
         {daysLeft}d left
       </Badge>
@@ -92,7 +92,7 @@ export function PromoPayoffPanel({
                   {promo && ` before ${formatShortDate(promo.endsOn)}`}.
                 </p>
                 {p.onTrack === false && p.projectedRemainingMinor != null && (
-                  <p className="mt-0.5 text-sm text-red-700 dark:text-red-400">
+                  <p className="mt-0.5 text-sm text-destructive">
                     At {formatMinor(p.currentMonthlyMinor!)}/mo min,{" "}
                     <EstimatedValue>{formatMinor(p.projectedRemainingMinor)}</EstimatedValue>{" "}
                     remains

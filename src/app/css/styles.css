@@ -469,7 +469,9 @@ h4,
 h5,
 h6,
 .font-heading {
-  font-family: var(--font-heading);
+  /* var(--font-syne) directly: --font-heading lives in @theme inline, which
+     inlines into utilities and emits no runtime variable (issue #10) */
+  font-family: var(--font-syne), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ===== ANIMATIONS ===== */
