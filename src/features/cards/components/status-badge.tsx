@@ -3,17 +3,21 @@
  * card rack). `status` is the already-resolved value from the one status
  * engine (resolveStatusBadge) — never re-derived here (EDR-003). Lifted out
  * of cards-table.tsx (issue #12) so the table and rack render it identically.
+ *
+ * `compact` swaps only the DISPLAYED label for a shorter one (same derivation,
+ * same tone) so the space-tight card-rack tile doesn't crowd out the card name
+ * at 2-col widths (design QA). The cards table keeps the full labels.
  */
 import { Badge } from "@/components/ui/badge"
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, compact = false }: { status: string; compact?: boolean }) {
   switch (status) {
     case "HIGH_UTILIZATION":
-      return <Badge variant="destructive">High Utilization</Badge>
+      return <Badge variant="destructive">{compact ? "High" : "High Utilization"}</Badge>
     case "PROMO_EXPIRED":
       return (
         <Badge variant="outline" className="border-destructive/50 text-destructive">
-          0% Expired
+          {compact ? "0% expired" : "0% Expired"}
         </Badge>
       )
     case "PROMO_ENDING_SOON":
@@ -22,7 +26,7 @@ export function StatusBadge({ status }: { status: string }) {
           variant="outline"
           className="border-warning/50 bg-warning/10 text-warning"
         >
-          0% Ending Soon
+          {compact ? "0% ending" : "0% Ending Soon"}
         </Badge>
       )
     case "DUE_SOON":
@@ -31,7 +35,7 @@ export function StatusBadge({ status }: { status: string }) {
           variant="outline"
           className="border-warning/50 bg-warning/10 text-warning"
         >
-          Due Soon
+          {compact ? "Due" : "Due Soon"}
         </Badge>
       )
     case "FROZEN":

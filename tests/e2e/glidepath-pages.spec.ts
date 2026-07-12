@@ -15,7 +15,9 @@ test.describe("Overview page", () => {
 
   test("renders the Hi-Fi metric tiles from seed", async ({ page }) => {
     await page.goto("/overview")
-    await expect(page.getByText("of $215,850.00 total limit across 18 cards")).toBeVisible()
+    // Total balance + utilization live in the hero now; the grid carries the
+    // complementary tiles only (available credit / 0% sheltered, min payments).
+    await expect(page.getByText(/of balance sheltered at 0% APR across 6 cards/)).toBeVisible()
     await expect(page.getByText("$572.92")).toBeVisible() // min payments/mo
   })
 
@@ -23,7 +25,8 @@ test.describe("Overview page", () => {
     await page.goto("/overview")
     await expect(page.getByText(/Card rack/)).toBeVisible()
     await expect(page.getByTestId("rack-tile")).toHaveCount(6) // 18 cards, capped at 6
-    await expect(page.getByText("High Utilization").first()).toBeVisible() // status badge
+    // Rack badges use the compact label ("High"); the table keeps "High Utilization".
+    await expect(page.getByText("High", { exact: true }).first()).toBeVisible() // status badge
     const viewAll = page.getByRole("link", { name: /more cards · View all 18 cards/ })
     await expect(viewAll).toBeVisible()
     await expect(viewAll).toHaveAttribute("href", "/cards")

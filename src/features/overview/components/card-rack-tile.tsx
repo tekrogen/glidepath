@@ -37,12 +37,14 @@ export function CardRackTile({ card }: { card: RackCardDto }) {
     <Card className="flex flex-col gap-3 p-4" data-testid="rack-tile">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-medium">{card.cardName}</p>
+          <p className="line-clamp-2 font-medium leading-tight">{card.cardName}</p>
           {card.lastFour && (
             <p className="text-xs text-muted-foreground tabular-nums">····{card.lastFour}</p>
           )}
         </div>
-        <StatusBadge status={resolveStatusBadge(card.lifecycle, card.alert)} />
+        <span className="shrink-0">
+          <StatusBadge status={resolveStatusBadge(card.lifecycle, card.alert)} compact />
+        </span>
       </div>
 
       <div className="text-2xl font-bold tabular-nums">{formatMinor(card.balanceCents)}</div>

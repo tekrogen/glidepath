@@ -3,9 +3,11 @@
  * component: rows arrive already built + sorted by buildUpcomingPayments;
  * cents are serialized here at the RSC boundary. The amount is the RECORDED
  * minimum, an actual — rendered plain with no "~"/EstimatedValue (EDR-020
- * reserves the estimate marker for estimates). Per the wireframe each row
- * carries a disabled "Pay · Soon" affordance and a static "Auto" chip (no
- * autopay/payments model exists yet — Phase 3).
+ * reserves the estimate marker for estimates). The list is capped to the next
+ * few due items with a muted "+ N more" tally; a single widget-footer note
+ * stands in for per-row pay/autopay affordances (no payments model exists yet
+ * — Phase 3), keeping each row to date · card · amount so names render fully
+ * (design QA).
  */
 import { CalendarClock } from "lucide-react"
 
@@ -15,7 +17,12 @@ import type { UpcomingPayment } from "../utils/build-upcoming-payments"
 
 import { AddCardCta } from "./add-card-cta"
 
+const UPCOMING_LIMIT = 6
+
 export function UpcomingPaymentsWidget({ items }: { items: UpcomingPayment[] }) {
+  const shown = items.slice(0, UPCOMING_LIMIT)
+  const remaining = items.length - shown.length
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -33,44 +40,39 @@ export function UpcomingPaymentsWidget({ items }: { items: UpcomingPayment[] }) 
             <AddCardCta />
           </div>
         ) : (
-          <ul className="divide-y divide-border">
-            {items.map((item) => (
-              <li
-                key={item.cardId}
-                className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
-                data-testid="upcoming-payment"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{item.cardName}</p>
-                  <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground tabular-nums">
-                    {formatShortDate(item.dueDate)}
-                  </span>
-                </div>
-                <span className="shrink-0 text-sm tabular-nums">
-                  {item.minimumPaymentMinor == null ? (
-                    <span className="text-muted-foreground">Min not set</span>
-                  ) : (
-                    formatMinor(Number(item.minimumPaymentMinor))
-                  )}
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  <span
-                    className="inline-flex cursor-default items-center gap-1 px-1.5 text-xs font-medium text-muted-foreground/50"
-                    aria-disabled
-                    title="Payments arrive in a later phase"
-                  >
-                    Pay
-                    <span className="rounded border border-border px-1 py-px text-[9px] tracking-wide text-muted-foreground/70">
-                      Soon
+          <>
+            <ul className="divide-y divide-border">
+              {shown.map((item) => (
+                <li
+                  key={item.cardId}
+                  className="flex items-center gap-3 py-2.5 first:pt-0"
+                  data-testid="upcoming-payment"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{item.cardName}</p>
+                    <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground tabular-nums">
+                      {formatShortDate(item.dueDate)}
                     </span>
+                  </div>
+                  <span className="shrink-0 text-sm tabular-nums">
+                    {item.minimumPaymentMinor == null ? (
+                      <span className="text-muted-foreground">Min not set</span>
+                    ) : (
+                      formatMinor(Number(item.minimumPaymentMinor))
+                    )}
                   </span>
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Auto
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            {remaining > 0 && (
+              <p className="pt-3 text-xs text-muted-foreground">
+                + {remaining} more due this cycle
+              </p>
+            )}
+            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+              Scheduling &amp; autopay arrive with Payments.
+            </p>
+          </>
         )}
       </CardContent>
     </Card>
