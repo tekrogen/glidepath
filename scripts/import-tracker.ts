@@ -23,7 +23,7 @@ import {
 
 const DEFAULTS = {
   file: "admin/internal/planning/dolce_credit_card_tracker.xlsx",
-  email: "demo@creditcardmanager.app",
+  email: "demo@glidepath.cards",
 }
 
 function arg(name: string): string | null {

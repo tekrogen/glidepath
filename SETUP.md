@@ -122,7 +122,7 @@ ANTHROPIC_MODEL=claude-sonnet-5   # or any current Claude model
 ## 4. Demo auth — read before deploying
 
 `ENABLE_DEMO_AUTH=true` registers a credentials provider with **public**
-credentials (`demo@creditcardmanager.app` / `demo-password`). This is
+credentials (`demo@glidepath.cards` / `demo-password`). This is
 intentional so a deployed sales/preview instance offers one-click sign-in —
 but anyone on the internet can sign in to that demo user.
 

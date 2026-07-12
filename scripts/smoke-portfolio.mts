@@ -1,7 +1,7 @@
 // One-shot smoke: repository + service against the seeded DB.
 import { PrismaClient } from "@prisma/client"
 const prisma = new PrismaClient()
-const user = await prisma.user.findUniqueOrThrow({ where: { email: "demo@creditcardmanager.app" } })
+const user = await prisma.user.findUniqueOrThrow({ where: { email: "demo@glidepath.cards" } })
 const { getCardPortfolio } = await import("../src/features/cards/server/service")
 const p = await getCardPortfolio(user.id, new Date(Date.UTC(2026, 6, 11)))
 const fmt = (m: bigint) => `$${(Number(m) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`

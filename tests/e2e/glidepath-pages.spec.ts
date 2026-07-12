@@ -58,7 +58,7 @@ test.describe("Sign-in error feedback (issue #11)", () => {
 
   test("wrong password shows an inline error instead of failing silently", async ({ page }) => {
     await page.goto("/signin")
-    await page.getByLabel("Email").fill("demo@creditcardmanager.app")
+    await page.getByLabel("Email").fill("demo@glidepath.cards")
     await page.getByLabel("Password").fill("wrong-password")
     await page.getByRole("button", { name: "Sign in" }).click()
     await expect(page.getByText(/sign-in failed|invalid|incorrect|try again/i).first()).toBeVisible()
@@ -68,7 +68,7 @@ test.describe("Sign-in error feedback (issue #11)", () => {
   test("demo autofill + submit reaches the dashboard", async ({ page }) => {
     await page.goto("/signin")
     await page.getByText("Fill in demo credentials").click()
-    await expect(page.getByLabel("Email")).toHaveValue("demo@creditcardmanager.app")
+    await expect(page.getByLabel("Email")).toHaveValue("demo@glidepath.cards")
     await page.getByRole("button", { name: "Sign in" }).click()
     await page.waitForURL(/dashboard|overview/)
   })
