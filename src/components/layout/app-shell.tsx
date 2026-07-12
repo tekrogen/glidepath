@@ -18,6 +18,7 @@ import { ThemeToggle as ColorThemeToggle } from "@/components/shared/ThemeToggle
 import { ThemeToggle as DarkModeToggle } from "@/components/layout/theme-toggle";
 import { NotificationMenu } from "@/components/layout/notification-menu";
 import { UserMenu } from "@/components/auth/ui/user-menu";
+import { AddCardTrigger } from "@/features/cards/components/add-card-trigger";
 import { manageNavLinks, primaryNavLinks, type NavLink } from "@/lib/nav-links";
 import type { NotificationPanel } from "@/features/notifications";
 
@@ -79,16 +80,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
         ))}
       </nav>
       <div className="border-t border-border px-3 py-3">
-        <span
-          className="flex w-full cursor-default items-center justify-center gap-2 rounded-md border border-primary/40 px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-primary/60"
-          aria-disabled
-          title="Add card arrives with the onboarding flow (Phase 2)"
-        >
-          + Add Card
-          <span className="rounded border border-border px-1 py-px text-[9px] text-muted-foreground/70">
-            Soon
-          </span>
-        </span>
+        <AddCardTrigger />
       </div>
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
