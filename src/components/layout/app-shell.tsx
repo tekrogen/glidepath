@@ -16,8 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle as ColorThemeToggle } from "@/components/shared/ThemeToggle";
 import { ThemeToggle as DarkModeToggle } from "@/components/layout/theme-toggle";
+import { NotificationMenu } from "@/components/layout/notification-menu";
 import { UserMenu } from "@/components/auth/ui/user-menu";
 import { manageNavLinks, primaryNavLinks, type NavLink } from "@/lib/nav-links";
+import type { NotificationPanel } from "@/features/notifications";
 
 function NavItem({
   link,
@@ -101,7 +103,13 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  notificationPanel,
+}: {
+  children: React.ReactNode;
+  notificationPanel: NotificationPanel;
+}) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -140,7 +148,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </Button>
           <span className="hidden md:block" />
-          <UserMenu />
+          <div className="flex items-center gap-1">
+            <NotificationMenu panel={notificationPanel} />
+            <UserMenu />
+          </div>
         </div>
         <main className="flex-1">
           <div className="px-4 py-8 sm:px-6 lg:px-8">{children}</div>

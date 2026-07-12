@@ -8,6 +8,8 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { formatStampDate } from "@/lib/formatting"
 import { getPortfolioForUser } from "@/features/cards"
+import { buildAttentionItems } from "@/features/overview"
+import { DashboardAttention } from "@/features/overview/components/dashboard-attention"
 import { PortfolioMetricGrid } from "@/features/overview/components/portfolio-metric-grid"
 import { PaydownPriorityPanel } from "@/features/paydown/components/paydown-priority-panel"
 import { PromoPayoffPanel } from "@/features/paydown/components/promo-payoff-panel"
@@ -21,6 +23,7 @@ export default async function OverviewPage() {
   }
 
   const { cards, summary, promoPlans } = await getPortfolioForUser(session.user.id)
+  const attentionItems = buildAttentionItems(cards, new Date())
 
   return (
     <div className="space-y-6">
@@ -37,6 +40,8 @@ export default async function OverviewPage() {
       </div>
 
       <PortfolioMetricGrid summary={summary} />
+
+      <DashboardAttention items={attentionItems} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <PaydownPriorityPanel cards={cards} />
