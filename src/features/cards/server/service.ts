@@ -12,13 +12,15 @@ import {
   type PortfolioSummary,
   type PromoPayoffPlan,
 } from "@/lib/finance"
-import { daysUntil } from "@/lib/finance"
 import {
   resolveAlert,
   resolveStatusBadge,
+  type Alert,
+  type ConnectionState,
   type Lifecycle,
   type StatusBadge,
 } from "@/features/cards/utils/card-status"
+import { dueInDays } from "@/features/cards/utils/due-dates"
 
 import { toFinanceCard } from "./mappers"
 import { findHouseholdCards, findHouseholdIdForUser, type CardRow } from "./repository"
@@ -32,6 +34,11 @@ export interface PortfolioCard {
   ownerLabel: string | null // null ⇒ shared
   lifecycle: Lifecycle
   statusBadge: StatusBadge
+  /** The resolved alert (pre-badge) — the attention feed reads this so the
+   *  derivation stays single-sourced (EDR-003). */
+  alert: Alert
+  /** Aggregator linkage health — never the status badge, always an attention input. */
+  syncStatus: ConnectionState
   utilization: number | null
   paydownPriority: number | null
   paymentDueDay: number | null
@@ -45,20 +52,9 @@ export interface CardPortfolio {
   cards: PortfolioCard[]
   summary: PortfolioSummary
   promoPlans: PromoPayoffPlan[]
-}
-
-/** Days until the next occurrence of a 1–31 due day (date-only, UTC). */
-export function dueInDays(paymentDueDay: number | null, today: Date): number | null {
-  if (paymentDueDay == null) return null
-  const y = today.getUTCFullYear()
-  const m = today.getUTCMonth()
-  const clamp = (yy: number, mm: number) => {
-    const lastDay = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate()
-    return new Date(Date.UTC(yy, mm, Math.min(paymentDueDay, lastDay)))
-  }
-  const thisMonth = clamp(y, m)
-  const next = daysUntil(thisMonth, today) >= 0 ? thisMonth : clamp(y, m + 1)
-  return daysUntil(next, today)
+  /** The clock every derived figure was computed with — downstream
+   *  consumers (attention builder) must reuse it, never a fresh Date. */
+  asOf: Date
 }
 
 function toPortfolioCard(
@@ -86,6 +82,8 @@ function toPortfolioCard(
     ownerLabel: row.ownerMember?.displayName ?? null,
     lifecycle: row.lifecycle as Lifecycle,
     statusBadge: resolveStatusBadge(row.lifecycle as Lifecycle, alert),
+    alert,
+    syncStatus: row.syncStatus as ConnectionState,
     utilization: utilization(finance.balanceMinor, finance.limitMinor),
     paydownPriority: priorities.get(row.id) ?? null,
     paymentDueDay: row.paymentDueDay,
@@ -103,6 +101,7 @@ export async function getCardPortfolio(userId: string, today = new Date()): Prom
       cards: [],
       summary: portfolioSummary([], today),
       promoPlans: [],
+      asOf: today,
     }
   }
   const rows = await findHouseholdCards(householdId)
@@ -120,5 +119,6 @@ export async function getCardPortfolio(userId: string, today = new Date()): Prom
     cards,
     summary: portfolioSummary(finance, today),
     promoPlans: promoPayoffPlans(finance, today),
+    asOf: today,
   }
 }

@@ -60,6 +60,7 @@ model User {
   preferences  UserPreferences?
   auditLogs    AuditLog[]
   plaidItems   PlaidItem[]
+  notifications Notification[]
   householdMembers HouseholdMember[]
 }
 
@@ -216,6 +217,36 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([action])
+}
+
+// In-app notifications — persisted attention items (issue #25).
+// One row per (user, occurrence): the dedupeKey unique makes the
+// write-on-read sync idempotent; rows are never updated by the sync.
+enum NotificationType {
+  PROMO_EXPIRED
+  PROMO_ENDING_SOON
+  HIGH_UTILIZATION
+  DUE_SOON
+  SYNC_FAILED
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  entityRef   String? // "card:<id>" — never a lastFour
+  dedupeKey   String // stable occurrence identity — controls re-notification
+  title       String
+  body        String
+  href        String?
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?
+  dismissedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
 }
 
 // Plaid integration
