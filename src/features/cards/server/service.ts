@@ -21,9 +21,18 @@ import {
   type StatusBadge,
 } from "@/features/cards/utils/card-status"
 import { dueInDays } from "@/features/cards/utils/due-dates"
+import type { CreateCardInput } from "@/features/cards/schemas/create-card-schema"
+import { emitDomainEvent } from "@/server/events/publishers"
 
+import { toCreateCardData } from "./create-card-data"
 import { toFinanceCard } from "./mappers"
-import { findHouseholdCards, findHouseholdIdForUser, type CardRow } from "./repository"
+import {
+  createCard,
+  findHouseholdCards,
+  findHouseholdIdForUser,
+  findOrCreateHouseholdForUser,
+  type CardRow,
+} from "./repository"
 
 export interface PortfolioCard {
   id: string
@@ -91,6 +100,30 @@ function toPortfolioCard(
     hasEstimatedInputs:
       row.aprSource === "UNKNOWN" || row.limitSource === "UNKNOWN" || row.minimumSource === "UNKNOWN",
   }
+}
+
+/**
+ * Create a card from validated form input — the app's first CreditCard
+ * mutation. The input → row mapping (promo + provenance conventions) is
+ * the pure, unit-tested toCreateCardData; the household is get-or-created
+ * so zero-card users are functional. The zero-membership branch itself is
+ * exercised by the deriveHouseholdIdentity unit tests + manual QA — the
+ * e2e demo user always has a seeded membership.
+ */
+export async function createCardForUser(
+  userId: string,
+  input: CreateCardInput
+): Promise<{ cardId: string }> {
+  const householdId = await findOrCreateHouseholdForUser(userId)
+  const card = await createCard(householdId, toCreateCardData(input))
+  await emitDomainEvent({
+    type: "CardAdded",
+    userId,
+    householdId,
+    cardId: card.id,
+    cardName: input.cardName,
+  })
+  return { cardId: card.id }
 }
 
 /** The full portfolio for a user's household; empty portfolio when none. */

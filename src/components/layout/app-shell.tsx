@@ -18,6 +18,8 @@ import { ThemeToggle as ColorThemeToggle } from "@/components/shared/ThemeToggle
 import { ThemeToggle as DarkModeToggle } from "@/components/layout/theme-toggle";
 import { NotificationMenu } from "@/components/layout/notification-menu";
 import { UserMenu } from "@/components/auth/ui/user-menu";
+import { AddCardTrigger } from "@/features/cards/components/add-card-trigger";
+import { AddCardSheet } from "@/features/cards/components/add-card-sheet";
 import { manageNavLinks, primaryNavLinks, type NavLink } from "@/lib/nav-links";
 import type { NotificationPanel } from "@/features/notifications";
 
@@ -57,7 +59,15 @@ function NavItem({
   );
 }
 
-function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function SidebarContent({
+  pathname,
+  onNavigate,
+  onAddCard,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+  onAddCard: () => void;
+}) {
   const isActive = (href: string) => pathname.startsWith(href);
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -79,16 +89,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
         ))}
       </nav>
       <div className="border-t border-border px-3 py-3">
-        <span
-          className="flex w-full cursor-default items-center justify-center gap-2 rounded-md border border-primary/40 px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-primary/60"
-          aria-disabled
-          title="Add card arrives with the onboarding flow (Phase 2)"
-        >
-          + Add Card
-          <span className="rounded border border-border px-1 py-px text-[9px] text-muted-foreground/70">
-            Soon
-          </span>
-        </span>
+        <AddCardTrigger onClick={onAddCard} />
       </div>
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -112,6 +113,15 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [addCardOpen, setAddCardOpen] = useState(false);
+
+  // Opening the sheet from the mobile drawer must close the drawer — the
+  // sheet lives at the shell root (outside the unmounting drawer) so
+  // closing it never returns the user to an open drawer.
+  const openAddCard = () => {
+    setSidebarOpen(false);
+    setAddCardOpen(true);
+  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -125,15 +135,21 @@ export function AppShell({
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <SidebarContent pathname={pathname} onNavigate={() => setSidebarOpen(false)} />
+            <SidebarContent
+              pathname={pathname}
+              onNavigate={() => setSidebarOpen(false)}
+              onAddCard={openAddCard}
+            />
           </aside>
         </div>
       )}
 
       {/* Desktop sidebar — the mockup's primary chrome */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border bg-card md:block">
-        <SidebarContent pathname={pathname} />
+        <SidebarContent pathname={pathname} onAddCard={openAddCard} />
       </aside>
+
+      <AddCardSheet open={addCardOpen} onOpenChange={setAddCardOpen} />
 
       {/* Content column */}
       <div className="flex min-w-0 flex-1 flex-col">

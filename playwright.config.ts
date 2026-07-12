@@ -47,6 +47,19 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /dashboard\.spec\.ts|settings-redirect\.spec\.ts|api-routes\.spec\.ts|glidepath-pages\.spec\.ts|theme-and-shell\.spec\.ts|notifications\.spec\.ts/,
     },
+
+    // Mutation specs insert real rows, so they run strictly AFTER the
+    // read-only authenticated specs that assert the seed-exact fixture
+    // (e.g. "18 cards"). Same session; depends on the read-only project.
+    {
+      name: 'authenticated-mutations',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+      dependencies: ['authenticated'],
+      testMatch: /add-card\.spec\.ts/,
+    },
   ],
 
   webServer: {
