@@ -6,19 +6,14 @@
  * tabular-nums). Status badges come precomputed from the canonical engine
  * (never re-derived here — EDR-003).
  */
-import { useMemo, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
-import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { EstimatedValue } from "@/components/ui/estimated-value"
-import { DUE_SOON_DAYS, resolveStatusBadge, type Alert, type Lifecycle } from "@/features/cards"
-import { freezeCard } from "@/features/cards/actions/freeze-card"
-import { unfreezeCard } from "@/features/cards/actions/unfreeze-card"
+import { resolveStatusBadge, type Alert, type Lifecycle } from "@/features/cards"
+import { FreezeControl } from "@/features/cards/components/freeze-control"
+import { StatusBadge } from "@/features/cards/components/status-badge"
 import { formatMinor, formatPercent } from "@/lib/formatting"
 
 export interface CardsTableRow {
@@ -67,172 +62,6 @@ const SWATCHES: Record<string, string> = {
   capitalone: "from-emerald-700 to-teal-400",
   apple: "from-zinc-600 to-zinc-400",
   ally: "from-purple-700 to-fuchsia-500",
-}
-
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "HIGH_UTILIZATION":
-      return <Badge variant="destructive">High Utilization</Badge>
-    case "PROMO_EXPIRED":
-      return (
-        <Badge variant="outline" className="border-destructive/50 text-destructive">
-          0% Expired
-        </Badge>
-      )
-    case "PROMO_ENDING_SOON":
-      return (
-        <Badge
-          variant="outline"
-          className="border-warning/50 bg-warning/10 text-warning"
-        >
-          0% Ending Soon
-        </Badge>
-      )
-    case "DUE_SOON":
-      return (
-        <Badge
-          variant="outline"
-          className="border-warning/50 bg-warning/10 text-warning"
-        >
-          Due Soon
-        </Badge>
-      )
-    case "FROZEN":
-      return (
-        <Badge variant="outline" className="border-secondary/50 text-secondary">
-          Frozen
-        </Badge>
-      )
-    default:
-      return (
-        <Badge variant="outline" className="border-success/40 text-success">
-          OK
-        </Badge>
-      )
-  }
-}
-
-/**
- * Per-row freeze/unfreeze control (issue #27). A ghost trigger opens a
- * Popover confirm carrying the EDR-007 disclosure (in-app tracking only)
- * and a due-payment warning. Confirming sets an optimistic lifecycle
- * override (instant badge flip via the one status engine), calls the
- * mutation, and — on success — shows an Undo toast + refreshes so server
- * truth reconciles the override. On failure it reverts and toasts the error.
- */
-function FreezeControl({
-  row,
-  lifecycle,
-  setOverride,
-}: {
-  row: CardsTableRow
-  /** Effective lifecycle (override ?? server) — decides the verb + confirm. */
-  lifecycle: Lifecycle
-  setOverride: (id: string, next: Lifecycle) => void
-}) {
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
-
-  const frozen = lifecycle === "FROZEN"
-  const verb = frozen ? "Unfreeze" : "Freeze"
-  const identity = row.lastFour ? `${row.cardName} ····${row.lastFour}` : row.cardName
-  const showDueWarning =
-    !frozen && row.dueInDays != null && row.dueInDays >= 0 && row.dueInDays <= DUE_SOON_DAYS
-
-  const run = (nextFrozen: boolean) => {
-    const next: Lifecycle = nextFrozen ? "FROZEN" : "ACTIVE"
-    const prev: Lifecycle = nextFrozen ? "ACTIVE" : "FROZEN"
-    startTransition(async () => {
-      setOverride(row.id, next)
-      const res = await (nextFrozen ? freezeCard(row.id) : unfreezeCard(row.id))
-      if (!res.success) {
-        setOverride(row.id, prev)
-        toast.error(res.message)
-        return
-      }
-      toast.success(res.message, {
-        action: {
-          label: "Undo",
-          onClick: () =>
-            startTransition(async () => {
-              setOverride(row.id, prev)
-              const undo = await (nextFrozen ? unfreezeCard(row.id) : freezeCard(row.id))
-              if (!undo.success) {
-                setOverride(row.id, next)
-                toast.error(undo.message)
-                return
-              }
-              router.refresh()
-            }),
-        },
-      })
-      router.refresh()
-    })
-  }
-
-  const onConfirm = () => {
-    setOpen(false)
-    run(!frozen)
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={isPending}
-          aria-label={`${verb} ${identity}`}
-        >
-          {verb}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3 text-sm">
-        <p className="font-medium">
-          {verb} {row.cardName}
-          {row.lastFour ? ` ····${row.lastFour}` : ""}?
-        </p>
-        {frozen ? (
-          <p className="text-muted-foreground">
-            This clears the frozen mark in Glidepath. It doesn&apos;t contact your issuer or change
-            anything with your bank.
-          </p>
-        ) : (
-          <p className="text-muted-foreground">
-            This marks the card as frozen in Glidepath to help you track it. It doesn&apos;t contact
-            your issuer or stop charges — freeze with your bank for that.
-          </p>
-        )}
-        {showDueWarning && (
-          <p className="rounded-md border border-warning/50 bg-warning/10 px-2 py-1.5 text-xs text-warning">
-            Payment due in {row.dueInDays} {row.dueInDays === 1 ? "day" : "days"} — freezing
-            won&apos;t change that.
-            {row.minPayCents != null && (
-              <>
-                {" "}
-                Minimum{" "}
-                {row.hasEstimatedInputs ? (
-                  <EstimatedValue>{formatMinor(row.minPayCents)}</EstimatedValue>
-                ) : (
-                  formatMinor(row.minPayCents)
-                )}
-                .
-              </>
-            )}
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={onConfirm} disabled={isPending}>
-            {verb}
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
 }
 
 function SortHeader({
@@ -416,9 +245,14 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <FreezeControl
-                      row={r}
-                      lifecycle={effectiveLifecycle}
-                      setOverride={setOverride}
+                      cardId={r.id}
+                      cardName={r.cardName}
+                      lastFour={r.lastFour}
+                      lifecycle={r.lifecycle}
+                      dueInDays={r.dueInDays}
+                      minPayCents={r.minPayCents}
+                      hasEstimatedInputs={r.hasEstimatedInputs}
+                      onLifecycleChange={(next) => setOverride(r.id, next)}
                     />
                   </td>
                 </tr>

@@ -18,6 +18,7 @@ import {
   promoPayoff,
   roundHalfAwayDiv,
   utilization,
+  utilizationStatus,
   whatIfExtraPayment,
   type FinanceCard,
 } from "@/lib/finance"
@@ -70,6 +71,18 @@ describe("utilization", () => {
     // $6,838.05 / $22,800 = 0.29992… → renders 30.0% but is below threshold
     expect(utilization(683805n, 2280000n)).toBeCloseTo(0.29992, 4)
     expect(isHighUtilization(683805n, 2280000n)).toBe(false)
+  })
+})
+
+describe("utilizationStatus (Overview header chip)", () => {
+  it("classifies against the exact high-utilization threshold", () => {
+    expect(utilizationStatus(0.2999)).toBe("ok")
+    expect(utilizationStatus(0.3)).toBe("high")
+    expect(utilizationStatus(0.9)).toBe("high")
+    expect(utilizationStatus(0)).toBe("ok")
+  })
+  it("is unknown when the fraction is null (no known limit)", () => {
+    expect(utilizationStatus(null)).toBe("unknown")
   })
 })
 
