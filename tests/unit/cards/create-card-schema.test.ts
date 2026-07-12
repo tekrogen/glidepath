@@ -111,6 +111,14 @@ describe("createCardSchema", () => {
       expect(fieldErrors({ cardName: "C", issuer: "B", creditLimit: "12.345" }).creditLimit).toBeDefined()
       expect(fieldErrors({ cardName: "C", issuer: "B", minimumPayment: "-5" }).minimumPayment).toBeDefined()
     })
+
+    it("rejects amounts over the $99,999,999.99 cap with a user-facing message", () => {
+      const errors = fieldErrors({ cardName: "C", issuer: "B", creditLimit: "100000000" })
+      expect(errors.creditLimit?.[0]).toContain("99,999,999.99")
+      // The cap itself is accepted.
+      const ok = createCardSchema.safeParse({ cardName: "C", issuer: "B", creditLimit: "99999999.99" })
+      expect(ok.success && ok.data.creditLimitMinor === 9999999999n).toBe(true)
+    })
   })
 
   describe("promo cross-field rule", () => {

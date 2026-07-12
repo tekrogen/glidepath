@@ -15,13 +15,20 @@ describe("parseDollarsToMinor", () => {
     expect(parseDollarsToMinor("68.07")).toBe(6807n)
   })
 
-  it("strips commas", () => {
+  it("accepts well-formed thousands grouping", () => {
     expect(parseDollarsToMinor("1,234.56")).toBe(123456n)
     expect(parseDollarsToMinor("215,850")).toBe(21585000n)
+    expect(parseDollarsToMinor("1,234,567.89")).toBe(123456789n)
   })
 
   it("trims surrounding whitespace", () => {
     expect(parseDollarsToMinor(" 12.34 ")).toBe(1234n)
+  })
+
+  it("rejects malformed grouping and locale-style separators", () => {
+    expect(parseDollarsToMinor("1,2,3")).toBeNull() // bad grouping
+    expect(parseDollarsToMinor("1.234,56")).toBeNull() // European locale
+    expect(parseDollarsToMinor("12,34")).toBeNull() // not a thousands group
   })
 
   it("rejects empty, negative, non-numeric, and >2-decimal input", () => {
@@ -32,6 +39,11 @@ describe("parseDollarsToMinor", () => {
     expect(parseDollarsToMinor("$12")).toBeNull()
     expect(parseDollarsToMinor(".50")).toBeNull()
     expect(parseDollarsToMinor("12.")).toBeNull()
+  })
+
+  it("parses large values — the range cap is the schema's job, not the parser's", () => {
+    expect(parseDollarsToMinor("100000000")).toBe(10000000000n) // $100M — parser accepts
+    expect(parseDollarsToMinor("99999999.99")).toBe(9999999999n) // MAX_AMOUNT_MINOR
   })
 })
 
