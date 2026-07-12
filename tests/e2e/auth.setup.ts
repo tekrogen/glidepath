@@ -18,7 +18,7 @@ setup('authenticate as demo user', async ({ page }) => {
   await page.getByLabel('Password').fill(DEMO_USER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  await page.waitForURL(/\/dashboard/, { timeout: 30000 });
+  await page.waitForURL(/\/overview/, { timeout: 30000 });
 
   await page.context().storageState({ path: authFile });
 });

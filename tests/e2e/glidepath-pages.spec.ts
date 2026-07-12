@@ -116,6 +116,6 @@ test.describe("Sign-in error feedback (issue #11)", () => {
     await page.getByText("Fill in demo credentials").click()
     await expect(page.getByLabel("Email")).toHaveValue("demo@glidepath.cards")
     await page.getByRole("button", { name: "Sign in" }).click()
-    await page.waitForURL(/dashboard|overview/)
+    await page.waitForURL(/overview/)
   })
 })

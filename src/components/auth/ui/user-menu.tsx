@@ -41,7 +41,6 @@ export function isAdmin(role: UserRole): boolean {
 
 /** Icon map for navigation links in the dropdown */
 const navIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  "/dashboard": Home,
   "/accounts": Landmark,
   "/transactions": CreditCard,
   "/analytics": TrendingUp,
