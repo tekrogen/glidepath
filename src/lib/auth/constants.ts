@@ -86,8 +86,8 @@ export const ADMIN_ROUTES = ["/admin"] as const;
  * Default redirect paths based on role
  */
 export const ROLE_DEFAULT_REDIRECTS: Record<UserRole, string> = {
-  USER: "/dashboard",
-  ADMIN: "/dashboard",
+  USER: "/overview",
+  ADMIN: "/overview",
 } as const;
 
 /**

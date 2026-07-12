@@ -134,7 +134,7 @@ export const authOptions: NextAuthOptions = {
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;
       }
-      return `${baseUrl}/dashboard`;
+      return `${baseUrl}/overview`;
     },
   },
   events: {

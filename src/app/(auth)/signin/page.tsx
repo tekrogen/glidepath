@@ -20,7 +20,7 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
-  const { callbackUrl = "/dashboard", error } = await searchParams;
+  const { callbackUrl = "/overview", error } = await searchParams;
 
   const session = await auth();
   if (session?.user) {
