@@ -1,16 +1,23 @@
 /**
- * Overview — layout per the mockup (tiles → paydown + promo panels),
- * styling per the Ebia idiom. A pure composition layer (EMP#2067 §28):
- * every figure is precomputed by lib/finance via the cards service.
+ * Overview — the full v2 dashboard per the 0b wireframe: total-balance header →
+ * metric grid → card rack (freeze inline) → attention feed → transactions +
+ * upcoming payments + spend donut → paydown + promo panels. A pure composition
+ * layer (EMP#2067 §28 / EDR-019): every figure is precomputed by lib/finance
+ * via the cards service; builders produce the derived arrays; components receive
+ * ready props. `asOf` is the single clock every builder reuses.
  */
 import { redirect } from "next/navigation"
 
 import { auth } from "@/lib/auth"
-import { formatStampDate } from "@/lib/formatting"
 import { getPortfolioForUser } from "@/features/cards"
-import { buildAttentionItems } from "@/features/overview"
+import { buildAttentionItems, buildUpcomingPayments } from "@/features/overview"
+import { CardRack } from "@/features/overview/components/card-rack"
 import { DashboardAttention } from "@/features/overview/components/dashboard-attention"
+import { OverviewHeader } from "@/features/overview/components/overview-header"
 import { PortfolioMetricGrid } from "@/features/overview/components/portfolio-metric-grid"
+import { SpendDonutWidget } from "@/features/overview/components/spend-donut-widget"
+import { TransactionsWidget } from "@/features/overview/components/transactions-widget"
+import { UpcomingPaymentsWidget } from "@/features/overview/components/upcoming-payments-widget"
 import { PaydownPriorityPanel } from "@/features/paydown/components/paydown-priority-panel"
 import { PromoPayoffPanel } from "@/features/paydown/components/promo-payoff-panel"
 
@@ -24,24 +31,27 @@ export default async function OverviewPage() {
 
   const { cards, summary, promoPlans, asOf } = await getPortfolioForUser(session.user.id)
   const attentionItems = buildAttentionItems(cards, asOf)
+  const upcomingPayments = buildUpcomingPayments(cards, asOf)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
-            {summary.cardCount} cards · one ledger
-          </p>
-          <h1 className="font-heading text-3xl font-bold tracking-tight">Overview</h1>
-        </div>
-        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-          {formatStampDate(new Date())} · Manual
-        </p>
-      </div>
+    <div className="space-y-8">
+      <OverviewHeader summary={summary} />
 
       <PortfolioMetricGrid summary={summary} />
 
+      <CardRack cards={cards} asOf={asOf} />
+
       <DashboardAttention items={attentionItems} />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <TransactionsWidget />
+        </div>
+        <div className="space-y-6">
+          <UpcomingPaymentsWidget items={upcomingPayments} />
+          <SpendDonutWidget />
+        </div>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <PaydownPriorityPanel cards={cards} />
