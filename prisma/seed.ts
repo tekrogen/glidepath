@@ -16,7 +16,7 @@ import { SEED_CARDS, SEED_HOUSEHOLD, SEED_VERSION } from './seed-data/glidepath-
 
 const prisma = new PrismaClient();
 
-const DEMO_EMAIL = 'demo@creditcardmanager.app';
+const DEMO_EMAIL = 'demo@glidepath.cards';
 const MONTHS_OF_HISTORY = 9;
 
 // Deterministic PRNG (mulberry32) — fixed seed so re-seeds are stable

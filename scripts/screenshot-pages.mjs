@@ -5,7 +5,7 @@ const scheme = process.env.SCHEME === "dark" ? "dark" : "light"
 const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1400, height: 1000 } })
 const page = await ctx.newPage()
 await page.goto("http://localhost:6014/signin")
-await page.getByLabel("Email").fill("demo@creditcardmanager.app")
+await page.getByLabel("Email").fill("demo@glidepath.cards")
 await page.getByLabel("Password").fill("demo-password")
 await page.getByRole("button", { name: "Sign in" }).click()
 await page.waitForURL(/dashboard|overview/)

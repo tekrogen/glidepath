@@ -20,7 +20,7 @@ import { GoogleIcon, GitHubIcon } from "@/lib/icons";
 import { getAuthErrorMessage } from "@/lib/auth/messages";
 
 // Public demo credentials — must match lib/auth/providers.ts and prisma/seed.ts
-const DEMO_EMAIL = "demo@creditcardmanager.app";
+const DEMO_EMAIL = "demo@glidepath.cards";
 const DEMO_PASSWORD = "demo-password";
 
 interface SignInFormProps {

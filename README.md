@@ -53,7 +53,7 @@ pnpm dev
 
 Open http://localhost:6014 and sign in with the demo account:
 
-> **demo@creditcardmanager.app** / **demo-password**
+> **demo@glidepath.cards** / **demo-password**
 
 No Plaid, OAuth, or Anthropic keys required for the demo. To link real
 (sandbox) accounts, see **[SETUP.md](./SETUP.md)** for the 10-minute Plaid

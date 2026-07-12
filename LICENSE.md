@@ -8,7 +8,7 @@ This repository contains commercially licensed template products. By purchasing,
 downloading, or using any template in this repository, you agree to be bound by
 the terms of the Credit Card Manager End User License Agreement (EULA).
 
-**Full EULA:** [https://creditcardmanager.app/legal/eula](https://creditcardmanager.app/legal/eula) **[not yet in place]**
+**Full EULA:** [https://glidepath.cards/legal/eula](https://glidepath.cards/legal/eula) **[not yet in place]**
 
 ---
 
@@ -69,5 +69,5 @@ Credit Card Manager'S TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT PAID FOR THE L
 ## Contact
 
 For licensing inquiries: [your@email.com]
-Website: [creditcardmanager.app]
-Purchase templates: [https://creditcardmanager.app/templates](https://creditcardmanager.app/templates)
+Website: [glidepath.cards]
+Purchase templates: [https://glidepath.cards/templates](https://glidepath.cards/templates)

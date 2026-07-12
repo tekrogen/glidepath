@@ -26,7 +26,7 @@ type Provider = AuthOptions["providers"][number];
  * These are PUBLIC constants matching the user created by `pnpm db:seed`.
  */
 export const DEMO_USER = {
-  email: "demo@creditcardmanager.app",
+  email: "demo@glidepath.cards",
   password: "demo-password",
   name: "Demo User",
 } as const;
