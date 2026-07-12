@@ -355,6 +355,9 @@ async function main() {
     });
     membersByName.set(m.displayName, member.id);
   }
+  // Notifications hold the CURRENT attention occurrences derived from these
+  // cards (issue #25) — reset them with the cards (the seed is the fixture).
+  await prisma.notification.deleteMany({ where: { userId: user.id } });
   await prisma.creditCard.deleteMany({ where: { householdId: household.id } });
   for (const c of SEED_CARDS) {
     await prisma.creditCard.create({
