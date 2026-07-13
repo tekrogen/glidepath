@@ -17,6 +17,7 @@ import { SEED_CARDS, SEED_HOUSEHOLD, SEED_VERSION } from './seed-data/glidepath-
 const prisma = new PrismaClient();
 
 const DEMO_EMAIL = 'demo@glidepath.cards';
+const EMPTY_EMAIL = 'empty@glidepath.cards';
 const MONTHS_OF_HISTORY = 9;
 
 // Deterministic PRNG (mulberry32) — fixed seed so re-seeds are stable
@@ -86,6 +87,19 @@ async function main() {
     create: {
       email: DEMO_EMAIL,
       name: 'Demo User',
+      role: UserRole.USER,
+      emailVerified: new Date(),
+    },
+  });
+
+  // 2b. Empty-state fixture (issue #29): a bare user with NO household
+  //     membership, so the first-run / empty states render. Never gets cards.
+  await prisma.user.upsert({
+    where: { email: EMPTY_EMAIL },
+    update: {},
+    create: {
+      email: EMPTY_EMAIL,
+      name: 'Fresh User',
       role: UserRole.USER,
       emailVerified: new Date(),
     },

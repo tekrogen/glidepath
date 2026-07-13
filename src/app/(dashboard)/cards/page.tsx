@@ -9,6 +9,7 @@ import { auth } from "@/lib/auth"
 import { daysUntil, utilization } from "@/lib/finance"
 import { formatAprBps, formatStampDate } from "@/lib/formatting"
 import { getPortfolioForUser } from "@/features/cards"
+import { CardsEmptyState } from "@/features/cards/components/cards-empty-state"
 import { CardsTable, type CardsTableRow } from "@/features/cards/components/cards-table"
 
 export const dynamic = "force-dynamic"
@@ -54,7 +55,7 @@ export default async function CardsPage() {
       <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
-            Sortable · {rows.length} active
+            {rows.length === 0 ? "Your portfolio" : `Sortable · ${rows.length} active`}
           </p>
           <h1 className="font-heading text-3xl font-bold tracking-tight">Cards</h1>
         </div>
@@ -62,7 +63,7 @@ export default async function CardsPage() {
           {formatStampDate(new Date())} · Manual
         </p>
       </div>
-      <CardsTable rows={rows} />
+      {rows.length === 0 ? <CardsEmptyState /> : <CardsTable rows={rows} />}
     </div>
   )
 }
