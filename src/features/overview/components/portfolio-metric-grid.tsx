@@ -14,6 +14,12 @@ import { EstimatedValue } from "@/components/ui/estimated-value"
 import { formatMinor, formatShortDate } from "@/lib/formatting"
 import type { PortfolioSummary } from "@/lib/finance"
 
+import {
+  availableCreditDisplay,
+  hasEstimatedInterest,
+  shelteredSubtitle,
+} from "../utils/metric-format"
+
 export function PortfolioMetricGrid({ summary }: { summary: PortfolioSummary }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -26,12 +32,9 @@ export function PortfolioMetricGrid({ summary }: { summary: PortfolioSummary }) 
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">
-            {formatMinor(summary.availableCreditMinor)}
+            {availableCreditDisplay(summary)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {formatMinor(summary.shelteredMinor)} of balance sheltered at 0% APR across{" "}
-            {summary.shelteredCardCount} cards
-          </p>
+          <p className="text-xs text-muted-foreground">{shelteredSubtitle(summary)}</p>
         </CardContent>
       </Card>
 
@@ -47,10 +50,18 @@ export function PortfolioMetricGrid({ summary }: { summary: PortfolioSummary }) 
             {formatMinor(summary.totalMinimumPaymentsMinor)}
           </div>
           <p className="text-xs text-muted-foreground">
-            + <EstimatedValue>{formatMinor(summary.estMonthlyInterestMinor)}</EstimatedValue>
-            /mo est. interest
-            {summary.nextPromoExpiration &&
-              ` · next 0% ends ${formatShortDate(summary.nextPromoExpiration)}`}
+            {hasEstimatedInterest(summary) ? (
+              <>
+                + <EstimatedValue>{formatMinor(summary.estMonthlyInterestMinor)}</EstimatedValue>
+                /mo est. interest
+                {summary.nextPromoExpiration &&
+                  ` · next 0% ends ${formatShortDate(summary.nextPromoExpiration)}`}
+              </>
+            ) : summary.nextPromoExpiration ? (
+              `Next 0% ends ${formatShortDate(summary.nextPromoExpiration)}`
+            ) : (
+              "No interest accruing this cycle"
+            )}
           </p>
         </CardContent>
       </Card>

@@ -173,6 +173,13 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
             </tr>
           </thead>
           <tbody className="divide-y">
+            {paged.length === 0 && (
+              <tr>
+                <td colSpan={10} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  No cards match.
+                </td>
+              </tr>
+            )}
             {paged.map((r) => {
               const high = r.utilization != null && r.utilization >= 0.3
               const effectiveLifecycle = lifecycleOverrides[r.id] ?? r.lifecycle
@@ -263,8 +270,12 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
       </div>
       <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
         <span>
-          Showing {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, sorted.length)}{" "}
-          of {sorted.length} active cards
+          {sorted.length === 0
+            ? "No cards"
+            : `Showing ${currentPage * PAGE_SIZE + 1}–${Math.min(
+                (currentPage + 1) * PAGE_SIZE,
+                sorted.length
+              )} of ${sorted.length} active cards`}
         </span>
         <span className="flex items-center gap-2">
           <button
