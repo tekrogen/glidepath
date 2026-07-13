@@ -32,6 +32,21 @@ export const DEMO_USER = {
 } as const;
 
 /**
+ * Empty-state fixture user (issue #29). A bare account with NO household
+ * membership, so its portfolio is empty by construction and the first-run /
+ * empty states render. E2E-only: it is NOT in the sign-in autofill or the
+ * 3-place demo-credential sync — only the ENABLE_DEMO_AUTH allowlist below.
+ */
+export const EMPTY_DEMO_USER = {
+  email: "empty@glidepath.cards",
+  password: "demo-password",
+  name: "Fresh User",
+} as const;
+
+/** The identities the demo credentials provider accepts. */
+const DEMO_IDENTITIES = [DEMO_USER, EMPTY_DEMO_USER] as const;
+
+/**
  * Constant-time string comparison to avoid leaking match length/position via timing.
  * Returns false on any length mismatch (timingSafeEqual requires equal-length buffers).
  */
@@ -100,23 +115,28 @@ export function getProviders(): Provider[] {
           const email = credentials.email as string;
           const password = credentials.password as string;
 
-          if (
-            !safeEqual(DEMO_USER.email, email) ||
-            !safeEqual(DEMO_USER.password, password)
-          ) {
+          // Match against every allowed identity without an early return, so
+          // the accepted-identity count never leaks via timing.
+          let identity: (typeof DEMO_IDENTITIES)[number] | null = null;
+          for (const candidate of DEMO_IDENTITIES) {
+            if (safeEqual(candidate.email, email) && safeEqual(candidate.password, password)) {
+              identity = candidate;
+            }
+          }
+          if (!identity) {
             return null;
           }
 
-          // Find or create the demo user (db:seed creates it with full data)
+          // Find or create the matched user (db:seed creates both)
           let user = await prisma.user.findUnique({
-            where: { email: DEMO_USER.email },
+            where: { email: identity.email },
           });
 
           if (!user) {
             user = await prisma.user.create({
               data: {
-                email: DEMO_USER.email,
-                name: DEMO_USER.name,
+                email: identity.email,
+                name: identity.name,
                 role: UserRole.USER,
                 emailVerified: new Date(),
               },
@@ -126,7 +146,7 @@ export function getProviders(): Provider[] {
           return {
             id: user.id,
             email: user.email,
-            name: user.name ?? DEMO_USER.name,
+            name: user.name ?? identity.name,
             image: user.image ?? undefined,
           };
         },

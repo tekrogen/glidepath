@@ -11,6 +11,7 @@ import path from 'node:path';
  */
 
 const authFile = path.join(__dirname, 'tests', '.auth', 'user.json');
+const emptyAuthFile = path.join(__dirname, 'tests', '.auth', 'empty.json');
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -60,6 +61,19 @@ export default defineConfig({
       dependencies: ['authenticated'],
       testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts/,
     },
+
+    // First-run / empty states (issue #29). Runs as a separate card-less user
+    // (empty.json), so it depends only on `setup` and never orders against the
+    // seeded-18-card read-only specs — it touches a different, isolated user.
+    {
+      name: 'empty-state',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: emptyAuthFile,
+      },
+      dependencies: ['setup'],
+      testMatch: /empty-state\.spec\.ts/,
+    },
   ],
 
   webServer: {
@@ -75,4 +89,4 @@ export default defineConfig({
   },
 });
 
-export { authFile };
+export { authFile, emptyAuthFile };
