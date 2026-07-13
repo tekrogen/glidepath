@@ -13,6 +13,7 @@ import { getPortfolioForUser } from "@/features/cards"
 import { buildAttentionItems, buildUpcomingPayments } from "@/features/overview"
 import { CardRack } from "@/features/overview/components/card-rack"
 import { DashboardAttention } from "@/features/overview/components/dashboard-attention"
+import { OverviewFirstRun } from "@/features/overview/components/overview-first-run"
 import { OverviewHeader } from "@/features/overview/components/overview-header"
 import { PortfolioMetricGrid } from "@/features/overview/components/portfolio-metric-grid"
 import { SpendDonutWidget } from "@/features/overview/components/spend-donut-widget"
@@ -30,6 +31,13 @@ export default async function OverviewPage() {
   }
 
   const { cards, summary, promoPlans, asOf } = await getPortfolioForUser(session.user.id)
+
+  // Zero-card first run: one designed welcome instead of a zeroed dashboard
+  // (issue #29). A composition branch, not math (EDR-019).
+  if (summary.cardCount === 0) {
+    return <OverviewFirstRun />
+  }
+
   const attentionItems = buildAttentionItems(cards, asOf)
   const upcomingPayments = buildUpcomingPayments(cards, asOf)
 
