@@ -4,9 +4,9 @@ import { Download } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getTransactionsData } from "@/lib/services/transaction-service";
-import { TransactionsEmptyState } from "./transactions-empty-state";
-import { TransactionList } from "./transaction-list";
+import { getTransactionsData } from "@/features/transactions/server/queries";
+import { TransactionsEmptyState } from "@/features/transactions/components/transactions-empty-state";
+import { TransactionList } from "@/features/transactions/components/transaction-list";
 
 function formatCurrency(amount: number): string {
   return amount.toLocaleString("en-US", {
