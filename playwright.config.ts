@@ -59,7 +59,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['authenticated'],
-      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts/,
+      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts|import-tracker\.spec\.ts/,
     },
 
     // First-run / empty states (issue #29). Runs as a separate card-less user

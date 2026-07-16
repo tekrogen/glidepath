@@ -14,6 +14,8 @@ test.describe("Overview first-run (card-less user)", () => {
     // The first-run state carries the Syne <h1> (theme-and-shell parity).
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
     await expect(page.getByRole("button", { name: /add your first card/i })).toBeVisible()
+    // #28 entry point: the import flow is the secondary path.
+    await expect(page.getByRole("link", { name: /import from tracker/i })).toBeVisible()
 
     // No leak of the demo fixture's totals, and no sparse artifacts.
     await expect(page.getByText("$43,969.72")).toHaveCount(0)
@@ -30,6 +32,8 @@ test.describe("Cards empty state (card-less user)", () => {
     await expect(page.getByRole("heading", { name: "Cards", exact: true })).toBeVisible()
     await expect(page.getByText("No cards yet")).toBeVisible()
     await expect(page.getByRole("button", { name: /add a card/i })).toBeVisible()
+    // #28 entry point: the import flow is the secondary path.
+    await expect(page.getByRole("link", { name: /import from tracker/i })).toBeVisible()
 
     await expect(page.getByTestId("card-row")).toHaveCount(0)
     await expect(page.getByText("1–0 of 0")).toHaveCount(0)

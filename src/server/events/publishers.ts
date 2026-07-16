@@ -12,6 +12,26 @@ const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   CardAdded: "CARD_ADDED",
   CardFrozen: "CARD_FROZEN",
   CardUnfrozen: "CARD_UNFROZEN",
+  TrackerImported: "TRACKER_IMPORTED",
+}
+
+/** Event-shaped audit details — the tracker import has no single card. */
+function auditDetails(event: DomainEvent): string {
+  if (event.type === "TrackerImported") {
+    return JSON.stringify({
+      householdId: event.householdId,
+      householdName: event.householdName,
+      created: event.created,
+      updated: event.updated,
+      removed: event.removed,
+      cardCount: event.cardCount,
+    })
+  }
+  return JSON.stringify({
+    cardId: event.cardId,
+    cardName: event.cardName,
+    householdId: event.householdId,
+  })
 }
 
 async function writeAuditLog(event: DomainEvent): Promise<void> {
@@ -20,11 +40,7 @@ async function writeAuditLog(event: DomainEvent): Promise<void> {
       userId: event.userId,
       action: AUDIT_ACTIONS[event.type],
       resource: "cards",
-      details: JSON.stringify({
-        cardId: event.cardId,
-        cardName: event.cardName,
-        householdId: event.householdId,
-      }),
+      details: auditDetails(event),
       success: true,
     },
   })
