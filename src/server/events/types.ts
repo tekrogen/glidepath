@@ -24,3 +24,13 @@ export type DomainEvent =
       cardId: string
       cardName: string
     }
+  | {
+      type: "TrackerImported"
+      userId: string
+      householdId: string
+      householdName: string
+      created: number
+      updated: number
+      removed: number
+      cardCount: number
+    }

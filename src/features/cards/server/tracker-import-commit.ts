@@ -30,6 +30,7 @@ export interface TrackerImportCardOutcome {
 }
 
 export interface TrackerImportResult {
+  householdId: string
   householdName: string
   created: number
   updated: number
@@ -142,5 +143,5 @@ export async function commitTrackerImport(
     }
   }
 
-  return { householdName, created, updated, removed, cards: outcomes }
+  return { householdId: household.id, householdName, created, updated, removed, cards: outcomes }
 }
