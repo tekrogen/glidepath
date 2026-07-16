@@ -61,7 +61,10 @@ export type ConfirmTrackerState =
       cards: TrackerImportCardOutcome[]
     }
 
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 // real trackers are ~17 KB; 5 MB is a generous guard
+// Real trackers are ~17 KB. 1 MB matches Next's server-action body limit —
+// anything larger dies at the transport before this guard, so the wizard
+// checks the same limit client-side for a friendly message.
+const MAX_UPLOAD_BYTES = 1024 * 1024
 
 function toPreviewCard(c: ParsedTrackerCard): TrackerPreviewCard {
   return {
@@ -126,6 +129,19 @@ export async function previewTrackerImport(
   if (!read.ok) return { status: "error", message: read.message }
 
   const cards = read.cards.map(toPreviewCard)
+  // In-file duplicates collapse onto one card at import (idempotent match
+  // key) — say so instead of letting the later row win silently (G14).
+  const seen = new Set<string>()
+  for (const c of cards) {
+    const key = `${c.cardName}|${c.issuer}|${c.lastFour ?? ""}`
+    if (seen.has(key)) {
+      c.warnings.push(
+        "duplicate of an earlier row (same name, issuer, and last four) — this row overwrites it on import"
+      )
+    } else {
+      seen.add(key)
+    }
+  }
   const totalWarnings = cards.reduce((sum, c) => sum + c.warnings.length, 0)
   return { status: "ready", fileName: read.fileName, cards, totalWarnings }
 }

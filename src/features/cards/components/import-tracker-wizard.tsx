@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { formatAprBps, formatMinor, formatShortDate } from "@/lib/formatting"
 import {
@@ -32,6 +33,13 @@ import {
 
 const previewInitial: PreviewTrackerState = { status: "idle" }
 const confirmInitial: ConfirmTrackerState = { status: "idle" }
+
+// Mirrors the server action's MAX_UPLOAD_BYTES ("use server" modules can
+// only export functions): reject oversized files here with a friendly
+// message — past 1 MB the request would die at Next's body limit instead.
+const MAX_UPLOAD_BYTES = 1024 * 1024
+
+const cardsWord = (n: number) => (n === 1 ? "card" : "cards")
 
 function aprDisplay(card: TrackerPreviewCard): string {
   if (card.promo) {
@@ -53,6 +61,7 @@ export function ImportTrackerWizard() {
 function WizardRun({ onRestart }: { onRestart: () => void }) {
   const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
+  const [clientError, setClientError] = useState<string | null>(null)
   const [previewState, previewAction, previewPending] = useActionState(
     previewTrackerImport,
     previewInitial
@@ -71,12 +80,17 @@ function WizardRun({ onRestart }: { onRestart: () => void }) {
 
   function dispatch(action: (fd: FormData) => void) {
     if (!file) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setClientError("That file is too large to be a card tracker.")
+      return
+    }
     const fd = new FormData()
     fd.append("file", file)
     startTransition(() => action(fd))
   }
 
   const errorMessage =
+    clientError ||
     (previewState.status === "error" && previewState.message) ||
     (confirmState.status === "error" && confirmState.message) ||
     null
@@ -85,9 +99,8 @@ function WizardRun({ onRestart }: { onRestart: () => void }) {
   // and move focus to the error banner so failures are perceivable.
   useEffect(() => {
     if (confirmState.status === "done") {
-      toast.success(
-        `Imported ${confirmState.created + confirmState.updated} cards into ${confirmState.householdName}`
-      )
+      const count = confirmState.created + confirmState.updated
+      toast.success(`Imported ${count} ${cardsWord(count)} into ${confirmState.householdName}`)
       router.refresh()
     }
   }, [confirmState, router])
@@ -99,13 +112,22 @@ function WizardRun({ onRestart }: { onRestart: () => void }) {
   return (
     <div className="space-y-6">
       <p role="status" className="sr-only">
-        {previewPending ? "Reading tracker…" : confirmPending ? "Importing cards…" : ""}
+        {previewPending
+          ? "Reading tracker…"
+          : confirmPending
+            ? "Importing cards…"
+            : step === "preview" && previewState.status === "ready"
+              ? `Preview ready: ${previewState.cards.length} ${cardsWord(previewState.cards.length)} found. Review, then confirm the import.`
+              : step === "done"
+                ? "Import complete."
+                : ""}
       </p>
 
       {errorMessage && (
         <div
           ref={errorRef}
           role="alert"
+          data-testid="import-error"
           tabIndex={-1}
           className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive focus:outline-none focus:ring-2 focus:ring-destructive/40"
         >
@@ -130,16 +152,21 @@ function WizardRun({ onRestart }: { onRestart: () => void }) {
             </p>
             <div className="w-full max-w-sm space-y-2 text-left">
               <Label htmlFor="tracker-file">Tracker workbook</Label>
-              <input
+              <Input
                 id="tracker-file"
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 aria-describedby="tracker-file-hint"
-                className="w-full cursor-pointer rounded-md border border-border bg-background text-sm text-muted-foreground file:mr-3 file:cursor-pointer file:rounded-l-md file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                disabled={pending}
+                className="h-auto cursor-pointer py-2 file:mr-3 file:cursor-pointer"
+                onChange={(e) => {
+                  setClientError(null)
+                  setFile(e.target.files?.[0] ?? null)
+                }}
               />
               <p id="tracker-file-hint" className="text-xs text-muted-foreground">
-                Cards are read from the &ldquo;Card Tracker&rdquo; sheet, rows 6–25
+                Cards are read from the &ldquo;Card Tracker&rdquo; sheet, rows 6–25; rows without
+                a card name are skipped
               </p>
             </div>
             <Button type="button" disabled={!file || pending} onClick={() => dispatch(previewAction)}>
@@ -189,7 +216,7 @@ function PreviewStep({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{state.fileName}</span> —{" "}
-          {state.cards.length} cards found
+          {state.cards.length} {cardsWord(state.cards.length)} found
         </p>
         <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={pending}>
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -198,11 +225,12 @@ function PreviewStep({
       </div>
 
       {state.totalWarnings > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <div className="flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
           <p className="text-muted-foreground">
             <span className="font-medium text-foreground">
-              {state.totalWarnings} field{state.totalWarnings === 1 ? "" : "s"} need attention.
+              {state.totalWarnings} {state.totalWarnings === 1 ? "field needs" : "fields need"}{" "}
+              attention.
             </span>{" "}
             Nothing is guessed silently — review the notes under each card, then confirm.
             Missing values can be filled in on the card after import.
@@ -242,7 +270,7 @@ function PreviewStep({
         </p>
         <Button type="button" onClick={onConfirm} disabled={pending}>
           {confirmPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Import {state.cards.length} cards
+          Import {state.cards.length} {cardsWord(state.cards.length)}
         </Button>
       </div>
     </div>
@@ -289,7 +317,7 @@ function PreviewRow({ card }: { card: TrackerPreviewCard }) {
             <ul className="space-y-0.5">
               {card.warnings.map((w) => (
                 <li key={w} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warning" aria-hidden />
                   {w}
                 </li>
               ))}
@@ -361,7 +389,7 @@ function ReportStep({
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={c.outcome === "created" ? "default" : "secondary"}>
-                      {c.outcome}
+                      {c.outcome === "created" ? "Created" : "Updated"}
                     </Badge>
                   </td>
                 </tr>
