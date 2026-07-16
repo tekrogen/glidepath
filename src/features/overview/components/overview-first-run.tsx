@@ -2,12 +2,13 @@
  * Overview zero-card first-run (issue #29, Gap G5). Replaces the raw $0.00
  * header + metric grid + hidden panels with one designed welcome when the
  * household has no cards yet. Server component; it embeds the client
- * <AddCardCta> — the ONLY working "get started" flow (#28 import UI does not
- * exist, so this never links a phantom import route or /connect-account).
+ * <AddCardCta>, with the tracker-import flow (#28) as the secondary path.
  * Keeps a Syne <h1> on /overview for a11y + theme parity (theme-and-shell).
  */
+import Link from "next/link"
 import { CalendarClock, CreditCard, PieChart, TrendingDown } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { AddCardCta } from "./add-card-cta"
@@ -42,9 +43,14 @@ export function OverviewFirstRun() {
             you&rsquo;re ready.
           </p>
           <p className="max-w-md text-xs text-muted-foreground">
-            Have a spreadsheet? The tracker-import CLI works today; an import screen is on the way.
+            Have a spreadsheet? Import your whole tracker in one pass.
           </p>
-          <AddCardCta label="Add your first card" />
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <AddCardCta label="Add your first card" />
+            <Button variant="outline" asChild>
+              <Link href="/cards/import">Import from tracker</Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

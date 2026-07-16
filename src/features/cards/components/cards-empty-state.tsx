@@ -1,11 +1,13 @@
 /**
  * Cards zero-card empty state (issue #29, Gap G5). Idiom B (the #12 widget
  * pattern): muted icon circle, heading, two-tier body, then the working
- * add-card CTA — never a phantom import route or /connect-account. Rendered by
+ * add-card CTA plus the tracker-import entry point (#28). Rendered by
  * the Cards page in place of the table when the portfolio has no cards.
  */
+import Link from "next/link"
 import { CreditCard } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AddCardCta } from "@/features/overview/components/add-card-cta"
 
@@ -26,7 +28,12 @@ export function CardsEmptyState() {
         <p className="max-w-sm text-xs text-muted-foreground">
           Manual entry works today — you&rsquo;re always in control.
         </p>
-        <AddCardCta label="Add a card" />
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <AddCardCta label="Add a card" />
+          <Button variant="outline" asChild>
+            <Link href="/cards/import">Import from tracker</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

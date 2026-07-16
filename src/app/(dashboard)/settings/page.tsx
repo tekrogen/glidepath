@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { User, CreditCard, Bell, Shield, Database, Trash2, Palette } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ConnectedAccountsList } from "@/components/plaid/connected-accounts-list";
@@ -224,6 +225,15 @@ export default async function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">Tracker Import</div>
+                <div className="text-sm text-gray-500">Import cards from your spreadsheet tracker (.xlsx)</div>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/cards/import">Import Cards</Link>
+              </Button>
+            </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">Data Export</div>
