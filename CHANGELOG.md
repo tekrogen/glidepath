@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/tekrogen/glidepath/compare/v1.1.0...v1.2.0) (2026-07-17)
+
+
+### Features
+
+* add card domain schema, Hi-Fi seed dataset, and portfolio service ([9e62cb7](https://github.com/tekrogen/glidepath/commit/9e62cb7e5f757b31425905cd8884e76816b5d3f9))
+* add-card flow — manual-first onboarding and the first card mutation ([#33](https://github.com/tekrogen/glidepath/issues/33)) ([6e1762b](https://github.com/tekrogen/glidepath/commit/6e1762b65187105fbd5bc1e9fcd4ca9706b38df2))
+* attention engine and persisted in-app notifications ([#32](https://github.com/tekrogen/glidepath/issues/32)) ([d4cbc5b](https://github.com/tekrogen/glidepath/commit/d4cbc5bc2f090ccd45235445d9ec368961c23423))
+* empty and first-run states across Overview and Cards (G5) ([#37](https://github.com/tekrogen/glidepath/issues/37)) ([cf34962](https://github.com/tekrogen/glidepath/commit/cf3496299cbb5c1cfda35ab3f62fdb714b935ce3))
+* freeze/unfreeze flow — popover confirm, optimistic chip, audited ([#34](https://github.com/tekrogen/glidepath/issues/34)) ([5bd2b34](https://github.com/tekrogen/glidepath/commit/5bd2b34337f25cf67bec7e3073b0f3c87d514d2a))
+* Glidepath sidebar shell per mockup IA; theme-token conformance specs ([e79623b](https://github.com/tekrogen/glidepath/commit/e79623bae149d0575ff2c1f844a69a4ec77b8c51))
+* Overview and Cards pages in the Ebia visual system ([711cd69](https://github.com/tekrogen/glidepath/commit/711cd691f09d4ff9906ca2772f29f9bd5be88a13))
+* Overview v2 composition per the 0b wireframe ([#35](https://github.com/tekrogen/glidepath/issues/35)) ([4c8f5b6](https://github.com/tekrogen/glidepath/commit/4c8f5b6575b8bc3d6dd18d89b9238952d03f62f6))
+* tracker-import onboarding UI — upload, preview, confirm (EDR-021 step 2) ([#39](https://github.com/tekrogen/glidepath/issues/39)) ([a3d0e4e](https://github.com/tekrogen/glidepath/commit/a3d0e4e68c41a5942dff326d3dbdc92ff8ee3d38))
+
+
+### Bug Fixes
+
+* hint that OAuth only works on the registered host ([#24](https://github.com/tekrogen/glidepath/issues/24)) ([30d6fbe](https://github.com/tekrogen/glidepath/commit/30d6fbeabd1a8afce9be4d37f6c2ed6c0d9b537b))
+* remove orphaned /dashboard route; land post-login on /overview ([#36](https://github.com/tekrogen/glidepath/issues/36)) ([414e9a0](https://github.com/tekrogen/glidepath/commit/414e9a0ba774ad56ca7879dfc1afeae34dc90abd))
+* retire creditcardmanager.app demo email and placeholder URLs ([#23](https://github.com/tekrogen/glidepath/issues/23)) ([3eff409](https://github.com/tekrogen/glidepath/commit/3eff409fe96e409783b337fb310679b58bcd6c2c))
+* surface sign-in errors inline; add LAN dev mode for phone testing ([f68322c](https://github.com/tekrogen/glidepath/commit/f68322c1bfabe97a6e62c3ecec84d2040b10c045))
+
+
+### Refactoring
+
+* migrate transactions domain into features/transactions ([#38](https://github.com/tekrogen/glidepath/issues/38)) ([4af7a52](https://github.com/tekrogen/glidepath/commit/4af7a52e17b5cebb1261288904bd4e44078ca068))
+
+
+### Documentation
+
+* capture session learnings in CLAUDE.md ([#17](https://github.com/tekrogen/glidepath/issues/17)) ([1f13aab](https://github.com/tekrogen/glidepath/commit/1f13aabd909ce7fa9ec7d18b53441e36842ac6b3))
+
 ## [1.1.0](https://github.com/tekrogen/glidepath/compare/v1.0.0...v1.1.0) (2026-07-11)
 
 
