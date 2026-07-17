@@ -35,8 +35,11 @@ console.log(`  On your phone   : ${url}`)
 console.log(`  NEXTAUTH_URL    : ${url}  (overrides .env for this run)`)
 console.log(`  Note: use the demo credentials on LAN — Google OAuth only works on registered hosts.\n`)
 
+// LAN_DEV_ORIGIN feeds next.config.ts → allowedDevOrigins. Without it,
+// Next 16 rejects the HMR websocket from the LAN-IP origin and pages never
+// hydrate on the phone — buttons render but nothing responds (issue #14).
 const child = spawn("next", ["dev", "-H", "0.0.0.0", "-p", String(PORT)], {
   stdio: "inherit",
-  env: { ...process.env, NEXTAUTH_URL: url },
+  env: { ...process.env, NEXTAUTH_URL: url, LAN_DEV_ORIGIN: ip },
 })
 child.on("exit", (code) => process.exit(code ?? 0))
