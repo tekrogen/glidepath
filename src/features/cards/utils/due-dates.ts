@@ -1,21 +1,18 @@
 /**
  * Due-date helpers — next occurrence of a 1–31 due day (date-only, UTC,
- * clamped to short months). The single owner of the due-day clamp: the
- * cards service and the attention builder (issue #25) both derive from it.
+ * clamped to short months). The cards service and the attention builder
+ * (issue #25) both derive from it; the clamp itself is owned by
+ * lib/finance (`clampedUtcDate`, issue #43).
  */
-import { daysUntil } from "@/lib/finance"
+import { clampedUtcDate, daysUntil } from "@/lib/finance"
 
 /** The next due date on or after `today`, or null when no due day is known. */
 export function nextDueDate(paymentDueDay: number | null, today: Date): Date | null {
   if (paymentDueDay == null) return null
   const y = today.getUTCFullYear()
   const m = today.getUTCMonth()
-  const clamp = (yy: number, mm: number) => {
-    const lastDay = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate()
-    return new Date(Date.UTC(yy, mm, Math.min(paymentDueDay, lastDay)))
-  }
-  const thisMonth = clamp(y, m)
-  return daysUntil(thisMonth, today) >= 0 ? thisMonth : clamp(y, m + 1)
+  const thisMonth = clampedUtcDate(y, m, paymentDueDay)
+  return daysUntil(thisMonth, today) >= 0 ? thisMonth : clampedUtcDate(y, m + 1, paymentDueDay)
 }
 
 /** Days until the next occurrence of a 1–31 due day (date-only, UTC). */
