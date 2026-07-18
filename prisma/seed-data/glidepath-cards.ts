@@ -1,5 +1,5 @@
 /**
- * Glidepath demo seed dataset (Blueprint EDR-018, SEED_VERSION 2).
+ * Glidepath demo seed dataset (Blueprint EDR-018, SEED_VERSION 3).
  *
  * Source of truth: the Hi-Fi mockup's Cards table + Overview tiles as of
  * its rendered date, 2026-07-11. Cards 1–10 are the mockup's visible page;
@@ -14,9 +14,12 @@
  *
  * This module is imported by BOTH prisma/seed.ts and the conformance
  * tests — the seed IS the fixture. Change it and tests fail loudly.
+ *
+ * v3 (issue #42): card figures unchanged; adds the payment-domain fixture
+ * in ./glidepath-payments (scheduled payments, statements, autopay links).
  */
 
-export const SEED_VERSION = 2
+export const SEED_VERSION = 3
 
 export const SEED_HOUSEHOLD = {
   name: "Dolce Household",

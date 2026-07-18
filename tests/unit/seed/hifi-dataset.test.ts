@@ -42,7 +42,8 @@ const cards: FinanceCard[] = SEED_CARDS.map((c, i) =>
 
 describe(`Hi-Fi dataset (SEED_VERSION ${SEED_VERSION})`, () => {
   it("is 18 cards", () => {
-    expect(SEED_VERSION).toBe(2)
+    // v3 = v2 card figures (unchanged) + the payment-domain fixture (issue #42)
+    expect(SEED_VERSION).toBe(3)
     expect(cards).toHaveLength(18)
   })
 

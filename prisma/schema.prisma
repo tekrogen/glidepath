@@ -51,16 +51,16 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  accounts     Account[]
-  sessions     Session[]
-  userAccounts UserAccount[]
-  transactions Transaction[]
-  budgets      Budget[]
-  insights     AIInsight[]
-  preferences  UserPreferences?
-  auditLogs    AuditLog[]
-  plaidItems   PlaidItem[]
-  notifications Notification[]
+  accounts         Account[]
+  sessions         Session[]
+  userAccounts     UserAccount[]
+  transactions     Transaction[]
+  budgets          Budget[]
+  insights         AIInsight[]
+  preferences      UserPreferences?
+  auditLogs        AuditLog[]
+  plaidItems       PlaidItem[]
+  notifications    Notification[]
   householdMembers HouseholdMember[]
 }
 
@@ -88,9 +88,9 @@ model UserAccount {
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  creditCards  CreditCard[]
 
   @@index([userId])
-  creditCards CreditCard[]
 }
 
 model Transaction {
@@ -388,8 +388,10 @@ model Household {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members HouseholdMember[]
-  cards   CreditCard[]
+  members           HouseholdMember[]
+  cards             CreditCard[]
+  financialAccounts FinancialAccount[]
+  paymentIntents    PaymentIntent[]
 }
 
 model HouseholdMember {
@@ -423,15 +425,15 @@ model CreditCard {
   cardType  CardType @default(PERSONAL)
   currency  String   @default("USD") // ISO 4217 billing currency
 
-  creditLimitMinor     BigInt? // null ⇒ utilization undefined
-  currentBalanceMinor  BigInt  @default(0) // positive amount owed
+  creditLimitMinor      BigInt? // null ⇒ utilization undefined
+  currentBalanceMinor   BigInt  @default(0) // positive amount owed
   statementBalanceMinor BigInt?
-  regularAprBps        Int? // 2274 = 22.74%
-  statementCloseDay    Int? // 1-31
-  paymentDueDay        Int? // 1-31
-  paymentDueTimeZone   String  @default("America/New_York")
-  minimumPaymentMinor  BigInt?
-  paymentNote          String? // free text by design: "$350/month", "Statement Amt"
+  regularAprBps         Int? // 2274 = 22.74%
+  statementCloseDay     Int? // 1-31
+  paymentDueDay         Int? // 1-31
+  paymentDueTimeZone    String  @default("America/New_York")
+  minimumPaymentMinor   BigInt?
+  paymentNote           String? // free text by design: "$350/month", "Statement Amt"
 
   lifecycle    CardLifecycle  @default(ACTIVE)
   syncStatus   CardSyncStatus @default(MANUAL)
@@ -443,14 +445,18 @@ model CreditCard {
   minimumSource FieldSource @default(UNKNOWN)
 
   userAccountId String? // optional aggregator link
-  notes         String? @db.Text
+  notes         String?  @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  household   Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  ownerMember HouseholdMember? @relation("CardOwner", fields: [ownerMemberId], references: [id], onDelete: SetNull)
-  userAccount UserAccount?     @relation(fields: [userAccountId], references: [id], onDelete: SetNull)
-  promoPeriods PromoPeriod[]
+  household         Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ownerMember       HouseholdMember?     @relation("CardOwner", fields: [ownerMemberId], references: [id], onDelete: SetNull)
+  userAccount       UserAccount?         @relation(fields: [userAccountId], references: [id], onDelete: SetNull)
+  promoPeriods      PromoPeriod[]
+  paymentIntents    PaymentIntent[]
+  scheduledPayments ScheduledPayment[]
+  statements        Statement[]
+  autopayLink       ProviderAutopayLink?
 
   @@index([householdId])
 }
@@ -471,4 +477,144 @@ model PromoPeriod {
   card CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
+}
+
+// ── Payment domain (Phase 3, EDR-010) ────────────────────────────────────────
+// Record-only: these tables capture user intent and tracking state. Nothing
+// here executes, initiates, or reconciles a real payment (Level 0 boundary).
+
+enum FinancialAccountType {
+  CHECKING
+  SAVINGS
+  OTHER
+}
+
+enum PaymentIntentStatus {
+  DRAFT
+  SUBMITTED
+  EXPIRED
+}
+
+enum ScheduledPaymentStatus {
+  SCHEDULED
+  DONE
+  SKIPPED
+  CANCELED
+}
+
+// Funding-account metadata only — names where a payment will come from.
+// No balances and no sync: it is a reference label, not a ledger.
+model FinancialAccount {
+  id          String               @id @default(cuid())
+  householdId String
+  name        String
+  institution String?
+  accountType FinancialAccountType @default(CHECKING)
+  lastFour    String? // text: preserves leading zeros; NEVER a key
+  currency    String               @default("USD") // ISO 4217
+  notes       String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  paymentIntents    PaymentIntent[]
+  scheduledPayments ScheduledPayment[]
+
+  @@index([householdId])
+}
+
+// Expiring stepper draft: DRAFT (editable) → SUBMITTED (immutable) | EXPIRED (cron).
+// Fields stay optional while the draft is being assembled; the confirm step
+// validates completeness before recording the ScheduledPayment.
+model PaymentIntent {
+  id               String              @id @default(cuid())
+  householdId      String
+  cardId           String?
+  fundingAccountId String?
+  amountMinor      BigInt?
+  currency         String              @default("USD")
+  scheduledFor     DateTime?           @db.Date
+  note             String?
+  status           PaymentIntentStatus @default(DRAFT)
+  expiresAt        DateTime
+  submittedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  // card: Cascade is deliberate — drafts are ephemeral (cron-expired), not history.
+  // fundingAccount: Restrict — SetNull would mutate SUBMITTED (immutable) intents
+  // at the DB level; account removal resolves references via the service layer.
+  household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  card             CreditCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  fundingAccount   FinancialAccount? @relation(fields: [fundingAccountId], references: [id], onDelete: Restrict)
+  scheduledPayment ScheduledPayment?
+
+  @@index([householdId])
+  @@index([status, expiresAt]) // intent-expiry cron scan
+}
+
+// Record-only planned payment: SCHEDULED → DONE | SKIPPED | CANCELED.
+model ScheduledPayment {
+  id               String                 @id @default(cuid())
+  cardId           String
+  fundingAccountId String?
+  intentId         String?                @unique // one payment per confirmed intent — DB backstop for idempotent confirm
+  amountMinor      BigInt
+  currency         String                 @default("USD")
+  scheduledFor     DateTime               @db.Date
+  status           ScheduledPaymentStatus @default(SCHEDULED)
+  resolvedAt       DateTime? // set when status leaves SCHEDULED
+  note             String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  // Restrict, not Cascade/SetNull: these rows are the payment history a
+  // record-only product exists to keep (EDR-010). Card or funding-account
+  // removal must resolve them through the service layer (audited), never
+  // silently at the DB — "cross-aggregate effects via services, not a cascade".
+  card           CreditCard        @relation(fields: [cardId], references: [id], onDelete: Restrict)
+  fundingAccount FinancialAccount? @relation(fields: [fundingAccountId], references: [id], onDelete: Restrict)
+  intent         PaymentIntent?    @relation(fields: [intentId], references: [id], onDelete: SetNull)
+
+  @@index([cardId])
+  @@index([scheduledFor])
+}
+
+// First-class immutable statement record (EDR-015): no update path exists in
+// the service layer, hence no updatedAt. Discrepancies vs the card's balance
+// become attention items — never auto-mutation. Document ingest is out of
+// scope (Level 0 boundary); statement data arrives as values, not files.
+model Statement {
+  id                    String      @id @default(cuid())
+  cardId                String
+  periodStart           DateTime?   @db.Date
+  closingDate           DateTime    @db.Date
+  dueDate               DateTime?   @db.Date
+  statementBalanceMinor BigInt
+  minimumDueMinor       BigInt?
+  currency              String      @default("USD") // ISO 4217
+  source                FieldSource @default(MANUAL)
+  createdAt             DateTime    @default(now())
+
+  // Restrict: statements are an immutable, append-only aggregate (EDR-015) —
+  // card removal resolves them via the service layer, never a silent cascade.
+  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Restrict)
+
+  @@unique([cardId, closingDate]) // one record per statement close; ingestion idempotency backstop
+}
+
+// Where autopay actually lives (EDR-016: provider link-out, no in-app
+// scheduler). autopayActive feeds the PAY/AUTO chip on upcoming payments.
+model ProviderAutopayLink {
+  id            String   @id @default(cuid())
+  cardId        String   @unique // one autopay arrangement per card
+  providerUrl   String? // issuer payment page for link-out
+  autopayActive Boolean  @default(false) // user confirmed autopay is set up at the issuer
+  note          String? // free text by design: "minimum on due date", "$350/month"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Restrict: user-entered config no import can rebuild — card removal
+  // resolves it via the service layer, never a silent cascade.
+  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Restrict)
 }
