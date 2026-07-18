@@ -13,6 +13,12 @@ import { PrismaClient, UserRole, AccountType, TransactionType, BudgetPeriod } fr
 import { initializeCategories } from '../src/lib/categories-init';
 import { categorizeTransaction } from '../src/lib/categories';
 import { SEED_CARDS, SEED_HOUSEHOLD, SEED_VERSION } from './seed-data/glidepath-cards';
+import {
+  SEED_AUTOPAY_LINKS,
+  SEED_FINANCIAL_ACCOUNTS,
+  SEED_SCHEDULED_PAYMENTS,
+  SEED_STATEMENTS,
+} from './seed-data/glidepath-payments';
 
 const prisma = new PrismaClient();
 
@@ -348,7 +354,7 @@ async function main() {
 
   console.log(`Seed complete: ${created} transactions upserted for ${DEMO_EMAIL}`);
 
-  // 7. Glidepath card domain — the Hi-Fi dataset (SEED_VERSION 2, EDR-018).
+  // 7. Glidepath card domain — the Hi-Fi dataset (SEED_VERSION 3, EDR-018).
   //    Idempotent: the household's cards are wiped and recreated each run.
   const household = await prisma.household.upsert({
     where: { id: 'seed-household-glidepath' },
@@ -372,9 +378,15 @@ async function main() {
   // Notifications hold the CURRENT attention occurrences derived from these
   // cards (issue #25) — reset them with the cards (the seed is the fixture).
   await prisma.notification.deleteMany({ where: { userId: user.id } });
+  // Card wipe cascades payment-domain children (ScheduledPayment, Statement,
+  // ProviderAutopayLink, card-linked PaymentIntent); household-scoped rows
+  // (FinancialAccount, card-less intents) need their own reset.
+  await prisma.paymentIntent.deleteMany({ where: { householdId: household.id } });
+  await prisma.financialAccount.deleteMany({ where: { householdId: household.id } });
   await prisma.creditCard.deleteMany({ where: { householdId: household.id } });
+  const cardIdsByName = new Map<string, string>();
   for (const c of SEED_CARDS) {
-    await prisma.creditCard.create({
+    const card = await prisma.creditCard.create({
       data: {
         householdId: household.id,
         ownerMemberId: c.owner ? membersByName.get(c.owner) : null,
@@ -406,9 +418,66 @@ async function main() {
           : undefined,
       },
     });
+    cardIdsByName.set(c.cardName, card.id);
   }
   console.log(
     `Glidepath cards seeded: ${SEED_CARDS.length} cards in "${SEED_HOUSEHOLD.name}" (seed version ${SEED_VERSION})`
+  );
+
+  // 7b. Payment-domain fixture (issue #42) — record-only rows per EDR-010.
+  //     Cards resolved by name (unique in the fixture; lastFour is never a key).
+  const day = (s: string) => new Date(`${s}T00:00:00Z`);
+  const accountIdsByName = new Map<string, string>();
+  for (const a of SEED_FINANCIAL_ACCOUNTS) {
+    const account = await prisma.financialAccount.create({
+      data: {
+        householdId: household.id,
+        name: a.name,
+        institution: a.institution,
+        accountType: a.accountType,
+        lastFour: a.lastFour,
+      },
+    });
+    accountIdsByName.set(a.name, account.id);
+  }
+  for (const p of SEED_SCHEDULED_PAYMENTS) {
+    await prisma.scheduledPayment.create({
+      data: {
+        cardId: cardIdsByName.get(p.cardName)!,
+        fundingAccountId: p.fundingAccountName ? accountIdsByName.get(p.fundingAccountName) : null,
+        amountMinor: p.amountMinor,
+        scheduledFor: day(p.scheduledFor),
+        status: p.status,
+        resolvedAt: p.resolvedAt ? day(p.resolvedAt) : null,
+        note: p.note,
+      },
+    });
+  }
+  for (const s of SEED_STATEMENTS) {
+    await prisma.statement.create({
+      data: {
+        cardId: cardIdsByName.get(s.cardName)!,
+        periodStart: s.periodStart ? day(s.periodStart) : null,
+        closingDate: day(s.closingDate),
+        dueDate: s.dueDate ? day(s.dueDate) : null,
+        statementBalanceMinor: s.statementBalanceMinor,
+        minimumDueMinor: s.minimumDueMinor,
+        source: 'MANUAL',
+      },
+    });
+  }
+  for (const l of SEED_AUTOPAY_LINKS) {
+    await prisma.providerAutopayLink.create({
+      data: {
+        cardId: cardIdsByName.get(l.cardName)!,
+        providerUrl: l.providerUrl,
+        autopayActive: l.autopayActive,
+        note: l.note,
+      },
+    });
+  }
+  console.log(
+    `Payment domain seeded: ${SEED_FINANCIAL_ACCOUNTS.length} account, ${SEED_SCHEDULED_PAYMENTS.length} scheduled payments, ${SEED_STATEMENTS.length} statements, ${SEED_AUTOPAY_LINKS.length} autopay links`
   );
 }
 

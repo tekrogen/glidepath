@@ -118,7 +118,7 @@ Project-specific conventions and gotchas. The behavioral guidelines above still 
 
 - Every code change: issue → `<type>/<issue#>-<slug>` branch → PR (`Closes #N`) → CI green → **squash-merge with a plain conventional title**. Branch protection on `main` requires both CI checks; admins exempt for emergencies.
 - Phases exit through the checklist in `admin/internal/planning/PHASE-GATES.md` (CI green, verify criteria, issue triage — no open critical/high for the phase, design QA for UI, release cut). Defects are filed as issues the moment they're found.
-- The seed **is** the test fixture (`SEED_VERSION 2` = the Hi-Fi dataset; tiles reconcile to the cent). Changing seed data or a finance formula must update the conformance suites knowingly — a to-the-cent test failure means the spec changed or the code is wrong, never "flaky".
+- The seed **is** the test fixture (`SEED_VERSION 3` = the Hi-Fi dataset + payment-domain fixture; tiles reconcile to the cent). Changing seed data or a finance formula must update the conformance suites knowingly — a to-the-cent test failure means the spec changed or the code is wrong, never "flaky".
 
 ### Things that must stay in sync (change one → change all)
 
