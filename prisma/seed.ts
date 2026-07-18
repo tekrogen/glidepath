@@ -378,10 +378,13 @@ async function main() {
   // Notifications hold the CURRENT attention occurrences derived from these
   // cards (issue #25) — reset them with the cards (the seed is the fixture).
   await prisma.notification.deleteMany({ where: { userId: user.id } });
-  // Card wipe cascades payment-domain children (ScheduledPayment, Statement,
-  // ProviderAutopayLink, card-linked PaymentIntent); household-scoped rows
-  // (FinancialAccount, card-less intents) need their own reset.
+  // Payment-domain rows are Restrict-linked (history is never cascade-deleted),
+  // so the reset removes them explicitly, references first:
+  // intents → payments → statements → autopay links → accounts → cards.
   await prisma.paymentIntent.deleteMany({ where: { householdId: household.id } });
+  await prisma.scheduledPayment.deleteMany({ where: { card: { householdId: household.id } } });
+  await prisma.statement.deleteMany({ where: { card: { householdId: household.id } } });
+  await prisma.providerAutopayLink.deleteMany({ where: { card: { householdId: household.id } } });
   await prisma.financialAccount.deleteMany({ where: { householdId: household.id } });
   await prisma.creditCard.deleteMany({ where: { householdId: household.id } });
   const cardIdsByName = new Map<string, string>();

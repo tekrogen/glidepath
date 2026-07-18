@@ -541,9 +541,12 @@ model PaymentIntent {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
+  // card: Cascade is deliberate — drafts are ephemeral (cron-expired), not history.
+  // fundingAccount: Restrict — SetNull would mutate SUBMITTED (immutable) intents
+  // at the DB level; account removal resolves references via the service layer.
   household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
   card             CreditCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  fundingAccount   FinancialAccount? @relation(fields: [fundingAccountId], references: [id], onDelete: SetNull)
+  fundingAccount   FinancialAccount? @relation(fields: [fundingAccountId], references: [id], onDelete: Restrict)
   scheduledPayment ScheduledPayment?
 
   @@index([householdId])
@@ -565,8 +568,12 @@ model ScheduledPayment {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
-  card           CreditCard        @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  fundingAccount FinancialAccount? @relation(fields: [fundingAccountId], references: [id], onDelete: SetNull)
+  // Restrict, not Cascade/SetNull: these rows are the payment history a
+  // record-only product exists to keep (EDR-010). Card or funding-account
+  // removal must resolve them through the service layer (audited), never
+  // silently at the DB — "cross-aggregate effects via services, not a cascade".
+  card           CreditCard        @relation(fields: [cardId], references: [id], onDelete: Restrict)
+  fundingAccount FinancialAccount? @relation(fields: [fundingAccountId], references: [id], onDelete: Restrict)
   intent         PaymentIntent?    @relation(fields: [intentId], references: [id], onDelete: SetNull)
 
   @@index([cardId])
@@ -589,7 +596,9 @@ model Statement {
   source                FieldSource @default(MANUAL)
   createdAt             DateTime    @default(now())
 
-  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  // Restrict: statements are an immutable, append-only aggregate (EDR-015) —
+  // card removal resolves them via the service layer, never a silent cascade.
+  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Restrict)
 
   @@unique([cardId, closingDate]) // one record per statement close; ingestion idempotency backstop
 }
@@ -605,5 +614,7 @@ model ProviderAutopayLink {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  // Restrict: user-entered config no import can rebuild — card removal
+  // resolves it via the service layer, never a silent cascade.
+  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Restrict)
 }
