@@ -1,5 +1,6 @@
 import { daysUntil, occurrencesInWindow } from "./days"
 import type { Minor } from "./money"
+import { maxMinor } from "./money"
 import type { FinanceCard } from "./types"
 import { utilization } from "./utilization"
 
@@ -32,8 +33,14 @@ export interface RunwayEvent {
    * scheduled: the payment amount; close: always null (informational chip).
    */
   amountMinor: Minor | null
-  /** due only: a SCHEDULED payment for this card covers this occurrence. */
+  /** due only: the claiming payment fully covers the recorded minimum. */
   covered?: boolean
+  /**
+   * due only: minimum still owed after the claiming payment — 0n when fully
+   * covered, the full minimum when unclaimed, in between for a partial
+   * payment ("partially covered" chip), null when no minimum is recorded.
+   */
+  shortfallMinor?: Minor | null
   /** scheduled only: the ScheduledPayment row id. */
   paymentId?: string
 }
@@ -73,11 +80,13 @@ export interface RunwayAggregate {
  * always emitted; the page (#44) chooses emphasis.
  *
  * Cash-needed rule (deterministic, disclosed in UI): each SCHEDULED
- * payment contributes its amount on its date; each due occurrence NOT
- * covered by a payment contributes the card's recorded minimum (unknown
- * minimum → contributes nothing). A payment covers the first uncovered
- * due occurrence on or after its date, matched greedily per card — one
- * payment never covers two dues. Close events never contribute cash.
+ * payment contributes its amount on its date; each due occurrence
+ * contributes its remaining minimum after the claiming payment (the
+ * shortfall — the full minimum when unclaimed, zero when the payment
+ * covers it, the difference for a partial payment; unknown minimum →
+ * contributes nothing). A payment claims the first unclaimed due
+ * occurrence on or after its date, matched greedily per card — one
+ * payment never claims two dues. Close events never contribute cash.
  */
 export function runwayAggregate(
   cards: RunwayCard[],
@@ -130,23 +139,27 @@ export function runwayAggregate(
     }
 
     if (card.paymentDueDay != null) {
-      // Greedy cover: each payment claims the first due on/after its date.
-      const unclaimed = active.map(({ delta }) => delta)
+      // Greedy claim: each payment claims the first due on/after its date.
+      const unclaimed = active.map(({ payment, delta }) => ({ delta, amountMinor: payment.amountMinor }))
       for (const due of occurrencesInWindow(card.paymentDueDay, today, horizonDays)) {
         const delta = daysUntil(due, today)
-        const claimIdx = unclaimed.findIndex((paymentDelta) => paymentDelta <= delta)
-        const covered = claimIdx !== -1
-        if (covered) unclaimed.splice(claimIdx, 1)
+        const claimIdx = unclaimed.findIndex((p) => p.delta <= delta)
+        const claimed = claimIdx === -1 ? null : unclaimed.splice(claimIdx, 1)[0]
+        const min = card.minimumPaymentMinor
+        const shortfallMinor =
+          min == null ? null : claimed == null ? min : maxMinor(0n, min - claimed.amountMinor)
+        const covered = claimed != null && (min == null || shortfallMinor === 0n)
         events.push({
           cardId: card.id,
           date: due,
           daysFromToday: delta,
           kind: "due",
-          amountMinor: card.minimumPaymentMinor,
+          amountMinor: min,
           covered,
+          shortfallMinor,
         })
-        if (!covered && card.minimumPaymentMinor != null) {
-          addCash(delta, card.minimumPaymentMinor)
+        if (shortfallMinor != null && shortfallMinor > 0n) {
+          addCash(delta, shortfallMinor)
         }
       }
     }

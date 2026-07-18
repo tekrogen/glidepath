@@ -40,6 +40,8 @@ export interface SeedCard {
   currentBalanceMinor: bigint
   regularAprBps: number | null
   paymentDueDay: number | null
+  /** v3: set on the statement-bearing cards, aligned with their statement fixtures' closingDate. */
+  statementCloseDay?: number
   minimumPaymentMinor: bigint | null
   promo: { endsOn: string; regularAprBpsAfter: number | null } | null // sheltered = full balance
   notes?: string
@@ -49,12 +51,12 @@ const d = (s: string) => s // ISO date strings, parsed at insert time
 
 export const SEED_CARDS: SeedCard[] = [
   // ── Hi-Fi Cards table, page 1 (visible in the mockup) ──
-  { cardName: "Horizon Cash", lastFour: "7727", issuer: "Chase", issuerKey: "chase", owner: null, cardType: "PERSONAL", creditLimitMinor: 1000000n, currentBalanceMinor: 809769n, regularAprBps: 2274, paymentDueDay: 4, minimumPaymentMinor: null, promo: null },
+  { cardName: "Horizon Cash", lastFour: "7727", issuer: "Chase", issuerKey: "chase", owner: null, cardType: "PERSONAL", creditLimitMinor: 1000000n, currentBalanceMinor: 809769n, regularAprBps: 2274, paymentDueDay: 4, statementCloseDay: 9, minimumPaymentMinor: null, promo: null },
   { cardName: "Cobalt One", lastFour: "9034", issuer: "Citibank", issuerKey: "citi", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 460000n, currentBalanceMinor: 316628n, regularAprBps: null, paymentDueDay: 5, minimumPaymentMinor: 3500n, promo: { endsOn: d("2027-09-05"), regularAprBpsAfter: 1990 } },
   { cardName: "Vertex Rewards", lastFour: "2210", issuer: "US Bank", issuerKey: "usbank", owner: "Bob", cardType: "PERSONAL", creditLimitMinor: 1000000n, currentBalanceMinor: 651300n, regularAprBps: null, paymentDueDay: 6, minimumPaymentMinor: 6500n, promo: { endsOn: d("2027-11-06"), regularAprBpsAfter: 2250 } },
   { cardName: "Atlas Flex", lastFour: "1652", issuer: "US Bank", issuerKey: "usbank", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 1300000n, currentBalanceMinor: 607888n, regularAprBps: null, paymentDueDay: 19, minimumPaymentMinor: 6100n, promo: { endsOn: d("2027-08-31"), regularAprBpsAfter: 2550 } },
   { cardName: "Beacon Everyday", lastFour: "5583", issuer: "Wells Fargo", issuerKey: "wellsfargo", owner: null, cardType: "PERSONAL", creditLimitMinor: 1200000n, currentBalanceMinor: 554500n, regularAprBps: 2349, paymentDueDay: 27, minimumPaymentMinor: 5500n, promo: null },
-  { cardName: "Meridian Blue", lastFour: "4412", issuer: "USAA", issuerKey: "usaa", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 500000n, currentBalanceMinor: 214000n, regularAprBps: 1924, paymentDueDay: 22, minimumPaymentMinor: 8500n, promo: null },
+  { cardName: "Meridian Blue", lastFour: "4412", issuer: "USAA", issuerKey: "usaa", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 500000n, currentBalanceMinor: 214000n, regularAprBps: 1924, paymentDueDay: 22, statementCloseDay: 27, minimumPaymentMinor: 8500n, promo: null },
   { cardName: "Summit Travel", lastFour: "6076", issuer: "Chase", issuerKey: "chase", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 2280000n, currentBalanceMinor: 683805n, regularAprBps: null, paymentDueDay: 11, minimumPaymentMinor: 6800n, promo: { endsOn: d("2027-08-14"), regularAprBpsAfter: 2820 } },
   { cardName: "Cascade Platinum", lastFour: "0042", issuer: "USAA", issuerKey: "usaa", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 1500000n, currentBalanceMinor: 423400n, regularAprBps: null, paymentDueDay: 1, minimumPaymentMinor: 4200n, promo: { endsOn: d("2026-10-01"), regularAprBpsAfter: 1924 } },
   { cardName: "Juniper Retail", lastFour: "3308", issuer: "Citibank", issuerKey: "citi", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 320000n, currentBalanceMinor: 30815n, regularAprBps: null, paymentDueDay: 15, minimumPaymentMinor: null, promo: { endsOn: d("2027-04-15"), regularAprBpsAfter: 1850 }, notes: "No minimum recorded — add it to see whether you're on track." },
@@ -70,5 +72,5 @@ export const SEED_CARDS: SeedCard[] = [
   // Missing last4 + unknown APR — deliberate real-data fixtures
   { cardName: "Sterling Simplicity", lastFour: null, issuer: "Citibank", issuerKey: "citi", owner: "Marti", cardType: "PERSONAL", creditLimitMinor: 2000000n, currentBalanceMinor: 0n, regularAprBps: null, paymentDueDay: null, minimumPaymentMinor: null, promo: null },
   { cardName: "Coastal CU", lastFour: null, issuer: "Space Coast", issuerKey: null, owner: null, cardType: "PERSONAL", creditLimitMinor: 2000000n, currentBalanceMinor: 0n, regularAprBps: null, paymentDueDay: null, minimumPaymentMinor: null, promo: null },
-  { cardName: "Quill Rewards", lastFour: "3303", issuer: "US Bank", issuerKey: "usbank", owner: "Bob", cardType: "PERSONAL", creditLimitMinor: 2460000n, currentBalanceMinor: 68667n, regularAprBps: 1935, paymentDueDay: 9, minimumPaymentMinor: 12692n, promo: null },
+  { cardName: "Quill Rewards", lastFour: "3303", issuer: "US Bank", issuerKey: "usbank", owner: "Bob", cardType: "PERSONAL", creditLimitMinor: 2460000n, currentBalanceMinor: 68667n, regularAprBps: 1935, paymentDueDay: 9, statementCloseDay: 14, minimumPaymentMinor: 12692n, promo: null },
 ]

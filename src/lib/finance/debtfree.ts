@@ -1,4 +1,4 @@
-import { daysUntil } from "./days"
+import { clampedUtcDate, daysUntil } from "./days"
 import type { AprBps, Minor } from "./money"
 import { ceilDiv } from "./money"
 import type { FinanceCard } from "./types"
@@ -38,8 +38,10 @@ function effectiveAprBps(card: FinanceCard, today: Date): AprBps | null {
  * per-card payoff sequence is what the strategy toggle displays.
  *
  * Avalanche sorts by effective APR desc (active promos rate as 0%,
- * unknown APR last); snowball by balance asc. Ties keep input order.
- * Returns null when the budget is not positive (nothing to project).
+ * unknown APR last); among equal rates, active promos ending sooner sort
+ * first — they resume accruing first (mirrors paydownRank's promo-end
+ * tie-break). Snowball sorts by balance asc. Remaining ties keep input
+ * order. Returns null when the budget is not positive (nothing to project).
  */
 export function debtFreePlan(
   cards: FinanceCard[],
@@ -50,8 +52,12 @@ export function debtFreePlan(
   if (monthlyBudgetMinor <= 0n) return null
 
   const carrying = cards.filter((c) => c.balanceMinor > 0n)
+  // Clamped month addition — Jan 31 + 1 month is Feb 28, never Mar 3.
   const monthDate = (months: number) =>
-    new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + months, today.getUTCDate()))
+    clampedUtcDate(today.getUTCFullYear(), today.getUTCMonth() + months, today.getUTCDate())
+
+  const promoEndMs = (c: FinanceCard) =>
+    c.promo && isPromoActive(c, today, daysUntil) ? c.promo.endsOn.getTime() : null
 
   const ordered = [...carrying].sort((a, b) => {
     if (strategy === "snowball") {
@@ -59,10 +65,15 @@ export function debtFreePlan(
     }
     const aprA = effectiveAprBps(a, today)
     const aprB = effectiveAprBps(b, today)
-    if (aprA === aprB) return 0
-    if (aprA == null) return 1
-    if (aprB == null) return -1
-    return aprB - aprA
+    if (aprA !== aprB) {
+      if (aprA == null) return 1
+      if (aprB == null) return -1
+      return aprB - aprA
+    }
+    const endA = promoEndMs(a)
+    const endB = promoEndMs(b)
+    if (endA != null && endB != null && endA !== endB) return endA - endB
+    return 0
   })
 
   const steps: DebtFreeStep[] = []

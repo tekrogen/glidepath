@@ -32,7 +32,7 @@ const cards: RunwayCard[] = SEED_CARDS.map((c) => ({
     ? { endsOn: utc(c.promo.endsOn), shelteredBalanceMinor: c.currentBalanceMinor, regularAprBpsAfter: c.promo.regularAprBpsAfter }
     : null,
   paymentDueDay: c.paymentDueDay,
-  statementCloseDay: null,
+  statementCloseDay: c.statementCloseDay ?? null,
 }))
 const payments: RunwayPayment[] = SEED_SCHEDULED_PAYMENTS.map((p, i) => ({
   id: `seed-${i}`,

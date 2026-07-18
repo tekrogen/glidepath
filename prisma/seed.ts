@@ -403,6 +403,7 @@ async function main() {
         currentBalanceMinor: c.currentBalanceMinor,
         regularAprBps: c.regularAprBps,
         paymentDueDay: c.paymentDueDay,
+        statementCloseDay: c.statementCloseDay ?? null,
         minimumPaymentMinor: c.minimumPaymentMinor,
         limitSource: c.creditLimitMinor != null ? 'MANUAL' : 'UNKNOWN',
         aprSource: c.regularAprBps != null || c.promo != null ? 'MANUAL' : 'UNKNOWN',
