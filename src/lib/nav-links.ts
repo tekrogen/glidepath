@@ -19,7 +19,7 @@ export const primaryNavLinks: NavLink[] = [
   { href: "/overview", label: "Overview" },
   { href: "/cards", label: "Cards" },
   { href: "/transactions", label: "Transactions" },
-  { href: "/payments", label: "Payments", comingSoon: true },
+  { href: "/payments", label: "Payments" },
   { href: "/rewards", label: "Rewards", comingSoon: true },
   { href: "/analytics", label: "Insights" },
 ];

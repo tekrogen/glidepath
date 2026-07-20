@@ -13,6 +13,7 @@ const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   CardFrozen: "CARD_FROZEN",
   CardUnfrozen: "CARD_UNFROZEN",
   TrackerImported: "TRACKER_IMPORTED",
+  PaymentRescheduled: "PAYMENT_RESCHEDULED",
 }
 
 /** Event-shaped audit details — the tracker import has no single card. */
@@ -25,6 +26,16 @@ function auditDetails(event: DomainEvent): string {
       updated: event.updated,
       removed: event.removed,
       cardCount: event.cardCount,
+    })
+  }
+  if (event.type === "PaymentRescheduled") {
+    return JSON.stringify({
+      cardId: event.cardId,
+      cardName: event.cardName,
+      householdId: event.householdId,
+      paymentId: event.paymentId,
+      fromDate: event.fromDate,
+      toDate: event.toDate,
     })
   }
   return JSON.stringify({

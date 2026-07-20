@@ -32,6 +32,11 @@ export function formatShortDate(d: Date): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} '${String(d.getUTCFullYear()).slice(2)}`
 }
 
+/** "Sep 5" (UTC date-only) — chips and near-horizon labels where the year is noise. */
+export function formatMonthDay(d: Date): string {
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`
+}
+
 /** "JUL 11 2026" for the header stamp. */
 export function formatStampDate(d: Date): string {
   return `${MONTHS[d.getUTCMonth()].toUpperCase()} ${d.getUTCDate()} ${d.getUTCFullYear()}`

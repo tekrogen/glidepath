@@ -34,3 +34,14 @@ export type DomainEvent =
       removed: number
       cardCount: number
     }
+  | {
+      type: "PaymentRescheduled"
+      userId: string
+      householdId: string
+      cardId: string
+      cardName: string
+      paymentId: string
+      /** ISO dates (yyyy-mm-dd) — the move the audit trail records. */
+      fromDate: string
+      toDate: string
+    }

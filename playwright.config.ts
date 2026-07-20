@@ -46,7 +46,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testMatch: /settings-redirect\.spec\.ts|api-routes\.spec\.ts|glidepath-pages\.spec\.ts|theme-and-shell\.spec\.ts|notifications\.spec\.ts/,
+      testMatch: /settings-redirect\.spec\.ts|api-routes\.spec\.ts|glidepath-pages\.spec\.ts|theme-and-shell\.spec\.ts|notifications\.spec\.ts|payments-runway\.spec\.ts/,
     },
 
     // Mutation specs insert real rows, so they run strictly AFTER the
@@ -59,7 +59,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['authenticated'],
-      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts|import-tracker\.spec\.ts/,
+      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts|import-tracker\.spec\.ts|reschedule-payment\.spec\.ts/,
     },
 
     // First-run / empty states (issue #29). Runs as a separate card-less user
