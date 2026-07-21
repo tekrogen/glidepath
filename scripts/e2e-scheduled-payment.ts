@@ -32,8 +32,14 @@ async function main() {
         select: { id: true },
       })
       if (!card) throw new Error(`Card "${CARD_NAME}" not found for the demo household`)
-      // Leftover from an aborted run must not duplicate.
-      await prisma.scheduledPayment.deleteMany({ where: { note: NOTE } })
+      // Leftover from an aborted run must not duplicate. Scoped to the demo
+      // household, never note-text alone (review finding).
+      await prisma.scheduledPayment.deleteMany({
+        where: {
+          note: NOTE,
+          card: { household: { members: { some: { user: { email: DEMO_EMAIL } } } } },
+        },
+      })
       const now = new Date()
       const scheduledFor = new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 10)
@@ -50,7 +56,12 @@ async function main() {
       })
       console.log(`Created ${row.id} for ${row.scheduledFor.toISOString().slice(0, 10)}`)
     } else if (command === "delete") {
-      const res = await prisma.scheduledPayment.deleteMany({ where: { note: NOTE } })
+      const res = await prisma.scheduledPayment.deleteMany({
+        where: {
+          note: NOTE,
+          card: { household: { members: { some: { user: { email: DEMO_EMAIL } } } } },
+        },
+      })
       console.log(`Deleted ${res.count} e2e payment(s).`)
     } else {
       throw new Error(`Usage: e2e-scheduled-payment.ts create|delete (got "${command}")`)

@@ -50,7 +50,7 @@ async function writeAuditLog(event: DomainEvent): Promise<void> {
     data: {
       userId: event.userId,
       action: AUDIT_ACTIONS[event.type],
-      resource: "cards",
+      resource: event.type === "PaymentRescheduled" ? "payments" : "cards",
       details: auditDetails(event),
       success: true,
     },

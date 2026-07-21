@@ -13,6 +13,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import {
+  addUtcDays,
   daysUntil,
   isPromoActive,
   rescheduleInterestDeltaMinor,
@@ -39,12 +40,7 @@ export interface LaneCard extends RunwayCard {
 }
 
 const utcDay = (iso: string) => new Date(`${iso}T00:00:00Z`)
-const addDaysIso = (base: Date, days: number) =>
-  new Date(
-    Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate() + days)
-  )
-    .toISOString()
-    .slice(0, 10)
+const addDaysIso = (base: Date, days: number) => addUtcDays(base, days).toISOString().slice(0, 10)
 
 export function RunwayView({ cards, payments, asOf }: RunwayViewProps) {
   const asOfDate = useMemo(() => utcDay(asOf), [asOf])
@@ -201,6 +197,25 @@ export function RunwayView({ cards, payments, asOf }: RunwayViewProps) {
           cardsById={cardsById}
           asOf={asOfDate}
           interestDeltaMinor={previewInterestMinor}
+          onNudge={(deltaDays) =>
+            setPreview((p) =>
+              p == null
+                ? null
+                : {
+                    ...p,
+                    toDay: Math.min(
+                      aggregate.horizonDays - 1,
+                      Math.max(0, p.toDay + deltaDays)
+                    ),
+                  }
+            )
+          }
+          onConfirm={() => {
+            if (preview && preview.toDay !== preview.fromDay) {
+              void commitReschedule(preview.paymentId, preview.toDay)
+            }
+          }}
+          onCancel={() => setPreview(null)}
         />
       </div>
     </div>

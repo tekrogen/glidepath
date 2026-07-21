@@ -50,6 +50,29 @@ test("keyboard reschedule previews ~interest, commits, and persists", async ({ p
   expect(await after.textContent()).not.toBe(before)
 })
 
+test("tap-select exposes the button reschedule path (SC 2.5.7)", async ({ page }) => {
+  await page.goto("/payments")
+  const chip = page.locator(CHIP, { hasText: "$42.00" })
+  await expect(chip).toBeVisible()
+  const before = await chip.textContent()
+
+  // A plain click selects — never moves — the payment.
+  await chip.click()
+  const preview = page.getByTestId("reschedule-preview")
+  await expect(preview).toContainText("Meridian Blue")
+  await expect(preview).toContainText("No change.")
+
+  await page.getByRole("button", { name: "A day later" }).click()
+  await expect(preview).toContainText("+1 day")
+  await page.getByTestId("reschedule-confirm").click()
+  await expect(page.getByText(/payment moved/i)).toBeVisible()
+
+  await page.reload()
+  const after = page.locator(CHIP, { hasText: "$42.00" })
+  await expect(after).toBeVisible()
+  expect(await after.textContent()).not.toBe(before)
+})
+
 test("Escape cancels a pending move without persisting", async ({ page }) => {
   await page.goto("/payments")
   const chip = page.locator(CHIP, { hasText: "$42.00" })

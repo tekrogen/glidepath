@@ -10,7 +10,7 @@
 import { MoveHorizontal } from "lucide-react"
 
 import { EstimatedValue } from "@/components/ui/estimated-value"
-import type { Minor } from "@/lib/finance"
+import { addUtcDays, type Minor } from "@/lib/finance"
 import { formatMinor, formatMonthDay } from "@/lib/formatting"
 
 import type { LaneCard } from "./runway-view"
@@ -32,18 +32,21 @@ export function ReschedulePanel({
   cardsById,
   asOf,
   interestDeltaMinor,
+  onNudge,
+  onConfirm,
+  onCancel,
 }: {
   preview: ReschedulePreview | null
   cardsById: Map<string, LaneCard>
   asOf: Date
   interestDeltaMinor: Minor | null
+  /** Move the selected payment's pending date by ±days (panel buttons — the non-drag pointer path, SC 2.5.7). */
+  onNudge: (deltaDays: number) => void
+  onConfirm: () => void
+  onCancel: () => void
 }) {
   const card = preview ? cardsById.get(preview.cardId) : null
-  const toDate = preview
-    ? new Date(
-        Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate() + preview.toDay)
-      )
-    : null
+  const toDate = preview ? addUtcDays(asOf, preview.toDay) : null
   const deltaDays = preview ? preview.toDay - preview.fromDay : 0
 
   return (
@@ -59,8 +62,9 @@ export function ReschedulePanel({
 
       {preview == null || toDate == null ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          Drag a payment chip along its lane — or focus it and use the arrow keys (Shift for a
-          week) — to move it. Enter confirms, Escape cancels. The interest impact previews here.
+          Drag a payment chip along its lane, tap it to select, or focus it and use the arrow
+          keys (Shift for a week). Enter confirms, Escape cancels. The interest impact previews
+          here.
         </p>
       ) : (
         <div className="mt-3 space-y-2 text-sm" data-testid="reschedule-preview">
@@ -93,9 +97,52 @@ export function ReschedulePanel({
               </>
             )}
           </p>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <NudgeButton label="−7" onClick={() => onNudge(-7)} aria="A week earlier" />
+            <NudgeButton label="−1" onClick={() => onNudge(-1)} aria="A day earlier" />
+            <NudgeButton label="+1" onClick={() => onNudge(1)} aria="A day later" />
+            <NudgeButton label="+7" onClick={() => onNudge(7)} aria="A week later" />
+            <button
+              type="button"
+              onClick={onConfirm}
+              data-testid="reschedule-confirm"
+              className="h-8 rounded-md bg-primary px-3 text-xs font-medium uppercase tracking-[0.12em] text-primary-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              data-testid="reschedule-cancel"
+              className="h-8 rounded-md border border-border px-3 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              Cancel
+            </button>
+          </div>
           <p className="text-xs text-muted-foreground">Enter confirms · Escape cancels</p>
         </div>
       )}
     </div>
+  )
+}
+
+function NudgeButton({
+  label,
+  aria,
+  onClick,
+}: {
+  label: string
+  aria: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={aria}
+      className="h-8 w-9 rounded-md border border-border font-mono text-xs tabular-nums text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      {label}
+    </button>
   )
 }

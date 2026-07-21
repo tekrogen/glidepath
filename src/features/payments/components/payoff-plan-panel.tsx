@@ -12,7 +12,12 @@ import { Route } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { debtFreePlan, parseDollarsToMinor, type DebtStrategy } from "@/lib/finance"
+import {
+  debtFreePlan,
+  parseDollarsToMinor,
+  portfolioSummary,
+  type DebtStrategy,
+} from "@/lib/finance"
 import { formatMinor, formatShortDate } from "@/lib/formatting"
 
 import type { LaneCard } from "./runway-view"
@@ -21,10 +26,12 @@ const STEP_LIMIT = 4
 
 export function PayoffPlanPanel({ cards, asOf }: { cards: LaneCard[]; asOf: Date }) {
   const [strategy, setStrategy] = useState<DebtStrategy>("avalanche")
+  // Default budget = the portfolio's recorded minimums — the figure
+  // lib/finance already owns (EDR-019: no re-derived sums in components).
   const defaultBudget = useMemo(() => {
-    const minimums = cards.reduce((sum, c) => sum + (c.minimumPaymentMinor ?? 0n), 0n)
+    const minimums = portfolioSummary(cards, asOf).totalMinimumPaymentsMinor
     return minimums > 0n ? (Number(minimums) / 100).toFixed(2) : ""
-  }, [cards])
+  }, [cards, asOf])
   const [budget, setBudget] = useState(defaultBudget)
 
   const budgetMinor = parseDollarsToMinor(budget)

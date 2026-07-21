@@ -11,7 +11,8 @@
  */
 import { useRef } from "react"
 
-import type { RunwayEvent, RunwayLane } from "@/lib/finance"
+import { addUtcDays, type RunwayEvent, type RunwayLane } from "@/lib/finance"
+import { DUE_SOON_DAYS } from "@/features/cards/utils/card-status"
 import { formatMinor, formatMonthDay, formatPercent } from "@/lib/formatting"
 
 import type { LaneCard, RunwayMode } from "./runway-view"
@@ -46,22 +47,22 @@ export function RunwayLanes({
   const tickLabel = (index: number) => {
     if (index === 0) return "Today"
     const day = Math.round((index * horizonDays) / TICK_COUNT)
-    return formatMonthDay(
-      new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate() + day))
-    )
+    return formatMonthDay(addUtcDays(asOf, day))
   }
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card" data-testid="runway-board">
-      <div className="grid grid-cols-[120px_1fr] border-b border-border bg-muted/40 md:grid-cols-[180px_1fr]">
-        <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="grid grid-cols-[120px_1fr] border-b border-border bg-muted/40 lg:grid-cols-[180px_1fr]">
+        <div className="px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Card / lane
         </div>
         <div className="grid grid-cols-6">
+          {/* 10px below lg is a recorded micro-size exception (design QA DS-006):
+              six date labels cannot hold 12px in a phone-width plot. */}
           {Array.from({ length: TICK_COUNT }, (_, i) => (
             <div
               key={i}
-              className={`border-l border-dashed border-border px-2 py-2 text-[11px] font-medium uppercase tracking-[0.14em] tabular-nums ${
+              className={`overflow-hidden whitespace-nowrap border-l border-dashed border-border px-1 py-2 text-[10px] font-medium uppercase tracking-[0.06em] tabular-nums lg:px-2 lg:text-xs lg:tracking-[0.14em] ${
                 i === 0 ? "text-primary" : "text-muted-foreground"
               }`}
             >
@@ -90,7 +91,7 @@ export function RunwayLanes({
         </p>
       )}
       {quiet > 0 && (
-        <p className="px-3 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
+        <p className="px-3 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
           + {quiet} {quiet === 1 ? "card" : "cards"} with no activity in this window
         </p>
       )}
@@ -118,7 +119,7 @@ function Lane({
   const frozen = card?.lifecycle === "FROZEN"
   return (
     <div
-      className="grid grid-cols-[120px_1fr] border-b border-border last:border-b-0 md:grid-cols-[180px_1fr]"
+      className="grid grid-cols-[120px_1fr] border-b border-border last:border-b-0 lg:grid-cols-[180px_1fr]"
       data-testid="runway-lane"
     >
       <div className={`min-w-0 px-3 py-2.5 ${frozen ? "opacity-60" : ""}`}>
@@ -135,7 +136,12 @@ function Lane({
         </p>
       </div>
 
-      <div className="relative h-14" data-lane-track>
+      <div
+        className="relative h-16"
+        data-lane-track
+        role="group"
+        aria-label={card?.cardName ?? "Card"}
+      >
         <div className="pointer-events-none absolute inset-0 grid grid-cols-6" aria-hidden>
           {Array.from({ length: TICK_COUNT }, (_, i) => (
             <div key={i} className="border-l border-dashed border-border/50" />
@@ -145,6 +151,7 @@ function Lane({
           <EventChip
             key={`${event.kind}-${event.paymentId ?? i}`}
             event={event}
+            cardName={card?.cardName ?? "Card"}
             mode={mode}
             horizonDays={horizonDays}
             preview={preview}
@@ -160,11 +167,20 @@ function Lane({
 /** Continuous slide: left/translateX by the same fraction keeps the chip inside the track at both ends. */
 const chipPosition = (day: number, horizonDays: number) => {
   const pct = (day / Math.max(1, horizonDays - 1)) * 100
-  return { left: `${pct}%`, transform: `translateX(-${pct}%) translateY(-50%)` }
+  return { left: `${pct}%`, transform: `translateX(-${pct}%)` }
 }
+
+/**
+ * Two sub-rows keep co-located chips legible (design QA): due chips ride
+ * the bottom row; scheduled + close chips the top — a payment that covers
+ * a due on the same date sits directly above it instead of on top of it.
+ */
+const ROW_TOP = "top-1.5"
+const ROW_BOTTOM = "bottom-1.5"
 
 function EventChip({
   event,
+  cardName,
   mode,
   horizonDays,
   preview,
@@ -172,60 +188,76 @@ function EventChip({
   onCommit,
 }: {
   event: RunwayEvent
+  cardName: string
   mode: RunwayMode
   horizonDays: number
   preview: ReschedulePreview | null
   onPreview: (preview: ReschedulePreview | null) => void
   onCommit: (paymentId: string, toDay: number) => void
 }) {
-  const dragRef = useRef<{ pointerId: number } | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    startX: number
+    fromDay: number
+    moved: boolean
+  } | null>(null)
 
+  // Contrast contract (design QA DS-001/002/005): chip TEXT is always
+  // foreground/muted-foreground — hue rides the border + tint only, so
+  // every rendered figure clears AA in both modes. De-emphasis for the
+  // inactive toggle kind swaps to muted colors at full opacity, never an
+  // opacity knockdown.
   const base =
-    "absolute top-1/2 whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[11px] tabular-nums transition-opacity"
+    "absolute whitespace-nowrap rounded-full border px-2 py-1 font-mono text-xs tabular-nums transition-colors"
 
   if (event.kind === "close") {
     return (
       <span
-        className={`${base} border-border bg-muted/60 text-muted-foreground ${
-          mode === "close" ? "border-secondary text-secondary" : "opacity-40"
+        className={`${base} ${ROW_TOP} bg-muted/60 text-muted-foreground ${
+          mode === "close" ? "border-secondary text-foreground" : "border-border"
         }`}
         style={chipPosition(event.daysFromToday, horizonDays)}
-        title={`Statement closes ${formatMonthDay(event.date)}`}
+        title={`${cardName} — statement closes ${formatMonthDay(event.date)}`}
         data-testid="runway-event"
         data-kind="close"
         data-dimmed={mode === "due"}
       >
-        Close {formatMonthDay(event.date)}
+        Close<span className="hidden lg:inline"> {formatMonthDay(event.date)}</span>
       </span>
     )
   }
 
   if (event.kind === "due") {
-    const uncoveredSoon = !event.covered && event.daysFromToday <= 7
+    // Single-sourced urgency: the status engine's DUE_SOON rule (EDR-003).
+    const uncoveredSoon = !event.covered && event.daysFromToday <= DUE_SOON_DAYS
     const amount =
       event.covered && (event.shortfallMinor === 0n || event.amountMinor == null)
-        ? "✓ covered"
+        ? "covered"
         : event.shortfallMinor != null && event.amountMinor != null && event.shortfallMinor < event.amountMinor
           ? `${formatMinor(event.shortfallMinor)} left`
           : event.amountMinor != null
             ? `${formatMinor(event.amountMinor)} min`
             : "min not set"
+    const dimmed = mode === "close"
     return (
       <span
-        className={`${base} ${
-          event.covered
-            ? "border-success/50 bg-success/10 text-success"
-            : uncoveredSoon
-              ? "border-warning/60 bg-warning/10 text-warning"
-              : "border-border bg-card text-foreground"
-        } ${mode === "close" ? "opacity-40" : ""}`}
+        className={`${base} ${ROW_BOTTOM} ${
+          dimmed
+            ? "border-border bg-card text-muted-foreground"
+            : event.covered
+              ? "border-success/50 bg-success/10 text-foreground"
+              : uncoveredSoon
+                ? "border-warning bg-warning/10 text-foreground"
+                : "border-border bg-card text-foreground"
+        }`}
         style={chipPosition(event.daysFromToday, horizonDays)}
-        title={`Payment due ${formatMonthDay(event.date)}`}
+        title={`${cardName} — payment due ${formatMonthDay(event.date)} · ${amount}`}
         data-testid="runway-event"
         data-kind="due"
-        data-dimmed={mode === "close"}
+        data-dimmed={dimmed}
       >
-        Due {formatMonthDay(event.date)} · {amount}
+        {event.covered && "✓ "}Due {formatMonthDay(event.date)}
+        <span className="hidden lg:inline"> · {amount}</span>
       </span>
     )
   }
@@ -236,13 +268,7 @@ function EventChip({
   const day = active ? preview.toDay : event.daysFromToday
   const clampDay = (d: number) => Math.min(horizonDays - 1, Math.max(0, d))
   // While a move is pending the chip tracks the TARGET date, not the stored one.
-  const shownDate = new Date(
-    Date.UTC(
-      event.date.getUTCFullYear(),
-      event.date.getUTCMonth(),
-      event.date.getUTCDate() + (day - event.daysFromToday)
-    )
-  )
+  const shownDate = addUtcDays(event.date, day - event.daysFromToday)
 
   const startPreview = (toDay: number) =>
     onPreview({
@@ -253,23 +279,48 @@ function EventChip({
       toDay: clampDay(toDay),
     })
 
+  // Drag is RELATIVE: the chip moves by the pointer's day-delta from the
+  // grab point, never jumps to the absolute pointer position, and a small
+  // pixel threshold keeps a jittery tap from becoming a move — a tap must
+  // never silently reschedule a payment (review findings). pointercancel
+  // (system gesture, incoming call) abandons the gesture and its preview.
+  const DRAG_THRESHOLD_PX = 8
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { pointerId: e.pointerId }
+    dragRef.current = { pointerId: e.pointerId, startX: e.clientX, fromDay: day, moved: false }
   }
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (dragRef.current?.pointerId !== e.pointerId) return
+    const drag = dragRef.current
+    if (drag?.pointerId !== e.pointerId) return
+    const dx = e.clientX - drag.startX
+    if (!drag.moved && Math.abs(dx) < DRAG_THRESHOLD_PX) return
+    drag.moved = true
     const track = e.currentTarget.closest("[data-lane-track]")
     if (!track) return
-    const rect = track.getBoundingClientRect()
-    const toDay = clampDay(Math.round(((e.clientX - rect.left) / rect.width) * (horizonDays - 1)))
+    const dayWidth = track.getBoundingClientRect().width / (horizonDays - 1)
+    const toDay = clampDay(drag.fromDay + Math.round(dx / dayWidth))
     if (toDay !== (active ? preview.toDay : event.daysFromToday)) startPreview(toDay)
   }
   const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (dragRef.current?.pointerId !== e.pointerId) return
+    const drag = dragRef.current
+    if (drag?.pointerId !== e.pointerId) return
     dragRef.current = null
+    // A gesture that actually dragged commits. A plain click/tap SELECTS
+    // the chip instead — the Reschedule panel then offers button nudges +
+    // Confirm, the non-drag single-pointer path SC 2.5.7 requires
+    // (design QA DS-003). Selection alone never mutates anything.
+    if (!drag.moved) {
+      if (!active) startPreview(day)
+      return
+    }
     if (active && preview.toDay !== event.daysFromToday) onCommit(paymentId, preview.toDay)
     else onPreview(null)
+  }
+  const handlePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current
+    if (drag?.pointerId !== e.pointerId) return
+    dragRef.current = null
+    if (drag.moved) onPreview(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -289,22 +340,27 @@ function EventChip({
   return (
     <button
       type="button"
-      className={`${base} cursor-grab touch-none select-none border-primary/50 bg-primary/10 text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:cursor-grabbing ${
-        mode === "close" ? "opacity-40 focus-visible:opacity-100" : ""
-      } ${active ? "z-10 opacity-100 ring-1 ring-ring" : ""}`}
+      className={`${base} ${ROW_TOP} cursor-grab touch-none select-none focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:cursor-grabbing ${
+        mode === "close" && !active
+          ? "border-border bg-muted/40 text-muted-foreground"
+          : "border-primary/50 bg-primary/10 text-primary"
+      } ${active ? "z-10 ring-1 ring-ring" : ""}`}
       style={chipPosition(day, horizonDays)}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onKeyDown={handleKeyDown}
-      onBlur={() => active && onPreview(null)}
-      aria-label={`Scheduled payment ${formatMinor(event.amountMinor ?? 0n)} on ${formatMonthDay(event.date)} — drag or use arrow keys to reschedule`}
+      aria-label={`${cardName} — scheduled payment ${formatMinor(event.amountMinor ?? 0n)} on ${formatMonthDay(shownDate)}${
+        active ? " (selected — arrows or panel buttons move it, Enter confirms, Escape cancels)" : ""
+      } — drag, tap to select, or use arrow keys to reschedule`}
       data-testid="runway-event"
       data-kind="scheduled"
       data-dimmed={mode === "close"}
       data-payment-id={paymentId}
     >
-      Pay {formatMinor(event.amountMinor ?? 0n)} · {formatMonthDay(shownDate)}
+      Pay<span className="hidden lg:inline"> {formatMinor(event.amountMinor ?? 0n)} ·</span>{" "}
+      {formatMonthDay(shownDate)}
     </button>
   )
 }

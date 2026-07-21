@@ -9,6 +9,11 @@ export function daysUntil(date: Date, today: Date): number {
 /** Average month length in days — good enough for payoff planning. */
 export const DAYS_PER_MONTH = 30.4375
 
+/** `date` + `days` in UTC date-only space (negative allowed). */
+export function addUtcDays(date: Date, days: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days))
+}
+
 /** Day-of-month `day` in (UTC year, monthIndex), clamped to the month's last day. */
 export function clampedUtcDate(year: number, monthIndex: number, day: number): Date {
   const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()

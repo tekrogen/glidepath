@@ -37,7 +37,7 @@ export function CashNeededChart({
             return (
               <div key={w.index} className="flex h-full flex-1 flex-col justify-end">
                 <div
-                  className={`w-full rounded-t ${w.index === 0 ? "bg-chart-1" : "bg-chart-2/70"}`}
+                  className={`w-full rounded-t ${w.index === 0 ? "bg-chart-1" : "bg-chart-2"}`}
                   style={{ height: `${Math.max(pct, w.cashNeededMinor > 0n ? 4 : 0)}%` }}
                   title={`Week of ${formatMonthDay(w.startsOn)}: ${formatMinor(w.cashNeededMinor)}`}
                   data-testid="cash-week-bar"

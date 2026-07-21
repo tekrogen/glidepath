@@ -12,7 +12,10 @@ import { revalidatePath } from "next/cache"
 
 import { auth } from "@/lib/auth"
 import { hasPermission } from "@/lib/auth/constants"
-import { reschedulePaymentForUser } from "@/features/payments/server/service"
+import {
+  RescheduleDateError,
+  reschedulePaymentForUser,
+} from "@/features/payments/server/service"
 
 export type RescheduleResult = {
   success: boolean
@@ -38,13 +41,27 @@ export async function reschedulePayment(
     return { success: false, message: "Invalid date." }
   }
   const scheduledFor = new Date(`${toDate}T00:00:00Z`)
-  if (Number.isNaN(scheduledFor.getTime())) {
+  // Round-trip check: Date.parse ROLLS OVER out-of-range days ("2026-02-31"
+  // parses to Mar 3) — reject, never reinterpret (review finding).
+  if (
+    Number.isNaN(scheduledFor.getTime()) ||
+    scheduledFor.toISOString().slice(0, 10) !== toDate
+  ) {
     return { success: false, message: "Invalid date." }
   }
 
   try {
     await reschedulePaymentForUser(session.user.id, paymentId, scheduledFor)
   } catch (error) {
+    if (error instanceof RescheduleDateError) {
+      return {
+        success: false,
+        message:
+          error.rule === "past"
+            ? "That date has already passed — reload to get today's runway."
+            : "Payments can only move within the 45-day runway window.",
+      }
+    }
     console.error("reschedulePayment failed:", error)
     return { success: false, message: "Could not move the payment — please try again." }
   }

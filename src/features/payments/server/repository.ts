@@ -30,25 +30,28 @@ export async function findScheduledPayments(householdId: string) {
  * (issue #44). Only unresolved rows move — DONE/SKIPPED/CANCELED are
  * history (EDR-010) and match zero rows here, same as a cross-household
  * or missing id. Returns the prior date + card identity for the audit
- * event.
+ * event; read + update share a transaction so the audit's fromDate is
+ * the date the update actually replaced (review finding).
  */
 export async function rescheduleScheduledPayment(
   householdId: string,
   paymentId: string,
   scheduledFor: Date
 ): Promise<{ updated: number; previousFor: Date | null; cardId: string | null; cardName: string | null }> {
-  const before = await prisma.scheduledPayment.findFirst({
-    where: { id: paymentId, status: "SCHEDULED", card: { householdId } },
-    select: { scheduledFor: true, card: { select: { id: true, cardName: true } } },
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.scheduledPayment.findFirst({
+      where: { id: paymentId, status: "SCHEDULED", card: { householdId } },
+      select: { scheduledFor: true, card: { select: { id: true, cardName: true } } },
+    })
+    const result = await tx.scheduledPayment.updateMany({
+      where: { id: paymentId, status: "SCHEDULED", card: { householdId } },
+      data: { scheduledFor },
+    })
+    return {
+      updated: result.count,
+      previousFor: before?.scheduledFor ?? null,
+      cardId: before?.card.id ?? null,
+      cardName: before?.card.cardName ?? null,
+    }
   })
-  const result = await prisma.scheduledPayment.updateMany({
-    where: { id: paymentId, status: "SCHEDULED", card: { householdId } },
-    data: { scheduledFor },
-  })
-  return {
-    updated: result.count,
-    previousFor: before?.scheduledFor ?? null,
-    cardId: before?.card.id ?? null,
-    cardName: before?.card.cardName ?? null,
-  }
 }
