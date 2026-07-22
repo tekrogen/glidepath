@@ -4,7 +4,7 @@
  * reconstructs bigints and calls lib/finance itself (the what-if
  * precedent) — math stays in the finance lib on both sides (EDR-019).
  */
-import type { PaymentRunway } from "../server/service"
+import type { PaymentRunway, PaymentSetup } from "../server/service"
 
 export interface RunwayCardDto {
   id: string
@@ -38,6 +38,50 @@ export interface RunwayViewProps {
 }
 
 const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+
+export interface FundingAccountDto {
+  id: string
+  name: string
+  institution: string | null
+  lastFour: string | null
+}
+
+export interface IntentDraftDto {
+  intentId: string
+  cardId: string | null
+  amountCents: number | null
+  scheduledFor: string | null
+  fundingAccountId: string | null
+  note: string | null
+  /** Full ISO timestamp — expiry is time-exact, not date-only. */
+  expiresAt: string
+}
+
+export interface PaymentStepperProps {
+  cards: RunwayCardDto[]
+  fundingAccounts: FundingAccountDto[]
+  draft: IntentDraftDto | null
+  asOf: string
+}
+
+export function toPaymentStepperProps(setup: PaymentSetup): PaymentStepperProps {
+  return {
+    cards: toRunwayViewProps({ cards: setup.cards, payments: [], asOf: setup.asOf }).cards,
+    fundingAccounts: setup.fundingAccounts,
+    draft: setup.draft
+      ? {
+          intentId: setup.draft.id,
+          cardId: setup.draft.cardId,
+          amountCents: setup.draft.amountMinor == null ? null : Number(setup.draft.amountMinor),
+          scheduledFor: setup.draft.scheduledFor ? isoDay(setup.draft.scheduledFor) : null,
+          fundingAccountId: setup.draft.fundingAccountId,
+          note: setup.draft.note,
+          expiresAt: setup.draft.expiresAt.toISOString(),
+        }
+      : null,
+    asOf: isoDay(setup.asOf),
+  }
+}
 
 export function toRunwayViewProps(runway: PaymentRunway): RunwayViewProps {
   return {

@@ -4,8 +4,12 @@
  */
 import { cache } from "react"
 
-import { getPaymentRunway } from "./service"
+import { getPaymentRunway, getPaymentSetup } from "./service"
 
 export const getRunwayForUser = cache(async (userId: string) => {
   return getPaymentRunway(userId)
+})
+
+export const getPaymentSetupForUser = cache(async (userId: string) => {
+  return getPaymentSetup(userId)
 })

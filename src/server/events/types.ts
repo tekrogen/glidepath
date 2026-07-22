@@ -45,3 +45,15 @@ export type DomainEvent =
       fromDate: string
       toDate: string
     }
+  | {
+      type: "PaymentScheduled"
+      userId: string
+      householdId: string
+      cardId: string
+      cardName: string
+      paymentId: string
+      intentId: string
+      /** Number cents + ISO date — event payloads are JSON (no bigint). */
+      amountCents: number
+      scheduledFor: string
+    }

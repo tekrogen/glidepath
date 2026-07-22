@@ -14,7 +14,13 @@ const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   CardUnfrozen: "CARD_UNFROZEN",
   TrackerImported: "TRACKER_IMPORTED",
   PaymentRescheduled: "PAYMENT_RESCHEDULED",
+  PaymentScheduled: "PAYMENT_SCHEDULED",
 }
+
+const PAYMENT_EVENTS: ReadonlySet<DomainEvent["type"]> = new Set([
+  "PaymentRescheduled",
+  "PaymentScheduled",
+])
 
 /** Event-shaped audit details — the tracker import has no single card. */
 function auditDetails(event: DomainEvent): string {
@@ -38,6 +44,17 @@ function auditDetails(event: DomainEvent): string {
       toDate: event.toDate,
     })
   }
+  if (event.type === "PaymentScheduled") {
+    return JSON.stringify({
+      cardId: event.cardId,
+      cardName: event.cardName,
+      householdId: event.householdId,
+      paymentId: event.paymentId,
+      intentId: event.intentId,
+      amountCents: event.amountCents,
+      scheduledFor: event.scheduledFor,
+    })
+  }
   return JSON.stringify({
     cardId: event.cardId,
     cardName: event.cardName,
@@ -50,7 +67,7 @@ async function writeAuditLog(event: DomainEvent): Promise<void> {
     data: {
       userId: event.userId,
       action: AUDIT_ACTIONS[event.type],
-      resource: event.type === "PaymentRescheduled" ? "payments" : "cards",
+      resource: PAYMENT_EVENTS.has(event.type) ? "payments" : "cards",
       details: auditDetails(event),
       success: true,
     },

@@ -1,12 +1,15 @@
 /**
  * Payments repository — the only module that touches Prisma for the
- * payments domain (arch doc §15). Card rows come from the cards
- * repository (that domain owns them); this one owns ScheduledPayment.
- * Authorization is the household id in the WHERE (EDR-014): a
- * cross-household id matches zero rows — no separate existence read,
- * no TOCTOU.
+ * payments domain (arch doc §15): ScheduledPayment, PaymentIntent, and
+ * FinancialAccount metadata. Card rows come from the cards repository
+ * (that domain owns them). Authorization is the household id in the
+ * WHERE (EDR-014): a cross-household id matches zero rows — no separate
+ * existence read, no TOCTOU.
  */
+import { Prisma } from "@prisma/client"
+
 import { prisma } from "@/lib/db/prisma"
+import type { Minor } from "@/lib/finance"
 
 export type ScheduledPaymentRow = Awaited<ReturnType<typeof findScheduledPayments>>[number]
 
@@ -22,6 +25,143 @@ export async function findScheduledPayments(householdId: string) {
       status: true,
     },
     orderBy: [{ scheduledFor: "asc" }],
+  })
+}
+
+/** Funding-account labels for the stepper's picker — metadata, never balances (EDR-010). */
+export async function findFundingAccounts(householdId: string) {
+  return prisma.financialAccount.findMany({
+    where: { householdId },
+    select: { id: true, name: true, institution: true, lastFour: true },
+    orderBy: [{ name: "asc" }],
+  })
+}
+
+const INTENT_SELECT = {
+  id: true,
+  cardId: true,
+  fundingAccountId: true,
+  amountMinor: true,
+  scheduledFor: true,
+  note: true,
+  status: true,
+  expiresAt: true,
+} satisfies Prisma.PaymentIntentSelect
+
+export type IntentRow = NonNullable<Awaited<ReturnType<typeof findActiveDraft>>>
+
+/** The household's newest un-expired DRAFT — the resumable stepper state. */
+export async function findActiveDraft(householdId: string, now: Date) {
+  return prisma.paymentIntent.findFirst({
+    where: { householdId, status: "DRAFT", expiresAt: { gt: now } },
+    select: INTENT_SELECT,
+    orderBy: [{ updatedAt: "desc" }],
+  })
+}
+
+export async function createDraft(householdId: string, expiresAt: Date) {
+  return prisma.paymentIntent.create({
+    data: { householdId, expiresAt },
+    select: INTENT_SELECT,
+  })
+}
+
+/**
+ * Update a live draft's fields (sliding TTL — every save re-arms
+ * expiresAt). The WHERE carries household + DRAFT + un-expired: an
+ * expired, submitted, or cross-household id updates zero rows.
+ */
+export async function updateDraft(
+  householdId: string,
+  intentId: string,
+  data: {
+    cardId?: string | null
+    fundingAccountId?: string | null
+    amountMinor?: Minor | null
+    scheduledFor?: Date | null
+    note?: string | null
+  },
+  now: Date,
+  expiresAt: Date
+): Promise<number> {
+  const result = await prisma.paymentIntent.updateMany({
+    where: { id: intentId, householdId, status: "DRAFT", expiresAt: { gt: now } },
+    data: { ...data, expiresAt },
+  })
+  return result.count
+}
+
+/** Delete a live draft (start-over). Ephemeral by design — no audit row. */
+export async function deleteDraft(householdId: string, intentId: string): Promise<number> {
+  const result = await prisma.paymentIntent.deleteMany({
+    where: { id: intentId, householdId, status: "DRAFT" },
+  })
+  return result.count
+}
+
+/** An intent + its recorded payment, household-scoped — the confirm path's read. */
+export async function findIntentWithPayment(householdId: string, intentId: string) {
+  return prisma.paymentIntent.findFirst({
+    where: { id: intentId, householdId },
+    select: {
+      ...INTENT_SELECT,
+      scheduledPayment: { select: { id: true } },
+      card: { select: { id: true, cardName: true } },
+    },
+  })
+}
+
+/**
+ * Record the ScheduledPayment for a complete draft and mark it SUBMITTED
+ * — the idempotent record-only confirm (issue #45, EDR-010). The
+ * `intentId @unique` constraint is the DB backstop: under a two-tab /
+ * double-submit race every path lands on exactly one payment row —
+ * whoever loses the create race reads the winner's row (P2002) and
+ * returns it. Runs in one transaction so a SUBMITTED intent always has
+ * its payment.
+ */
+export async function recordPaymentForIntent(intent: {
+  id: string
+  cardId: string
+  fundingAccountId: string | null
+  amountMinor: Minor
+  scheduledFor: Date
+  note: string | null
+}): Promise<{ paymentId: string; alreadyRecorded: boolean }> {
+  return prisma.$transaction(async (tx) => {
+    let paymentId: string
+    let alreadyRecorded = false
+    try {
+      const payment = await tx.scheduledPayment.create({
+        data: {
+          cardId: intent.cardId,
+          fundingAccountId: intent.fundingAccountId,
+          intentId: intent.id,
+          amountMinor: intent.amountMinor,
+          scheduledFor: intent.scheduledFor,
+          note: intent.note,
+        },
+        select: { id: true },
+      })
+      paymentId = payment.id
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const existing = await tx.scheduledPayment.findUnique({
+          where: { intentId: intent.id },
+          select: { id: true },
+        })
+        if (!existing) throw error
+        paymentId = existing.id
+        alreadyRecorded = true
+      } else {
+        throw error
+      }
+    }
+    await tx.paymentIntent.updateMany({
+      where: { id: intent.id, status: "DRAFT" },
+      data: { status: "SUBMITTED", submittedAt: new Date() },
+    })
+    return { paymentId, alreadyRecorded }
   })
 }
 
