@@ -31,6 +31,7 @@ import {
   recordPaymentForIntent,
   rescheduleScheduledPayment,
   updateDraft,
+  verifyDraftReferences,
   type IntentRow,
 } from "./repository"
 
@@ -77,10 +78,16 @@ export class RescheduleDateError extends Error {
   }
 }
 
-/** Thrown when a draft has expired or a confirm target is incomplete — user-facing rules. */
+/** Thrown for user-facing intent rules — the action maps each to a specific result. */
 export class IntentRuleError extends Error {
   constructor(
-    public readonly rule: "expired" | "incomplete" | "not-found",
+    public readonly rule:
+      | "expired"
+      | "incomplete"
+      | "not-found"
+      | "already-submitted"
+      | "foreign-card"
+      | "foreign-account",
     message: string
   ) {
     super(message)
@@ -121,9 +128,14 @@ export async function getPaymentSetup(userId: string, now = new Date()): Promise
 
 /**
  * Save the stepper's draft (issue #45): updates the caller's live draft,
- * or creates one when none exists (or the given id has expired — the
- * stale tab starts fresh rather than resurrecting a dead draft). Every
- * save re-arms the sliding TTL. Drafts are ephemeral: no domain event.
+ * reusing an existing one when the client has no id (two fresh tabs
+ * converge on one draft), creating one otherwise. Foreign-key payloads
+ * are resolved through household-scoped lookups first — the intent WHERE
+ * alone doesn't cover them (review finding, critical). A SUBMITTED
+ * intent is a hard stop, never a silent fresh draft: the ordinary
+ * two-tab flow would double-record through that fall-through (review
+ * finding). Only an EXPIRED/missing id falls through to a fresh draft.
+ * Every save re-arms the sliding TTL. Drafts are ephemeral: no event.
  */
 export async function saveIntentDraftForUser(
   userId: string,
@@ -132,6 +144,14 @@ export async function saveIntentDraftForUser(
 ): Promise<{ intentId: string; expiresAt: Date }> {
   const householdId = await findHouseholdIdForUser(userId)
   if (!householdId) throw new Error("Not authorized")
+
+  const { cardOk, accountOk } = await verifyDraftReferences(
+    householdId,
+    input.cardId,
+    input.fundingAccountId
+  )
+  if (!cardOk) throw new IntentRuleError("foreign-card", "Pick one of your cards.")
+  if (!accountOk) throw new IntentRuleError("foreign-account", "Pick one of your funding accounts.")
 
   const expiresAt = intentExpiresAt(now)
   const fields = {
@@ -145,7 +165,24 @@ export async function saveIntentDraftForUser(
   if (input.intentId != null) {
     const updated = await updateDraft(householdId, input.intentId, fields, now, expiresAt)
     if (updated > 0) return { intentId: input.intentId, expiresAt }
-    // Expired, submitted, or foreign id — fall through to a fresh draft.
+    const existing = await findIntentWithPayment(householdId, input.intentId)
+    if (existing?.status === "SUBMITTED") {
+      throw new IntentRuleError(
+        "already-submitted",
+        "This payment was already recorded — start a new one."
+      )
+    }
+    // Expired or missing — fall through to a fresh draft.
+  } else {
+    // No client id: converge on the household's live draft if one exists
+    // (two fresh tabs must not mint sibling drafts — review finding). The
+    // residual both-find-none race is accepted, same posture as
+    // findOrCreateHouseholdForUser.
+    const active = await findActiveDraft(householdId, now)
+    if (active) {
+      const updated = await updateDraft(householdId, active.id, fields, now, expiresAt)
+      if (updated > 0) return { intentId: active.id, expiresAt }
+    }
   }
   const draft = await createDraft(householdId, expiresAt)
   const updated = await updateDraft(householdId, draft.id, fields, now, expiresAt)
@@ -188,6 +225,14 @@ export async function confirmIntentForUser(
   }
   const completeness = validateIntentComplete(intent, now)
   if (!completeness.ok) throw new IntentRuleError("incomplete", completeness.message)
+
+  // Defense in depth: re-verify the FK targets at record time too — the
+  // draft was written under the same rule, but this is the money row.
+  const refs = await verifyDraftReferences(householdId, intent.cardId, intent.fundingAccountId)
+  if (!refs.cardOk) throw new IntentRuleError("foreign-card", "Pick one of your cards.")
+  if (!refs.accountOk) {
+    throw new IntentRuleError("foreign-account", "Pick one of your funding accounts.")
+  }
 
   const { paymentId, alreadyRecorded } = await recordPaymentForIntent({
     id: intent.id,

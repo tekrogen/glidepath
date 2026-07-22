@@ -9,14 +9,25 @@
  * update (monetary-mutation policy); idempotency lives in the DB
  * (`intentId @unique`), so a double-submit converges on one payment.
  */
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { parseDollarsToMinor } from "@/lib/finance"
-import { formatMinor, formatMonthDay } from "@/lib/formatting"
+import { formatMinor, formatShortDate, toDollarInput } from "@/lib/formatting"
 import {
   confirmIntent,
   discardIntentDraft,
@@ -26,6 +37,15 @@ import type { PaymentStepperProps } from "@/features/payments/utils/serialize"
 
 const STEPS = ["Card & amount", "Date & funding", "Review & confirm"] as const
 
+/** Which step renders each field — a save error jumps the user to it. */
+const FIELD_STEP: Record<string, number> = {
+  cardId: 0,
+  amount: 0,
+  scheduledFor: 1,
+  fundingAccountId: 1,
+  note: 1,
+}
+
 interface Fields {
   cardId: string
   amount: string
@@ -34,8 +54,7 @@ interface Fields {
   note: string
 }
 
-const centsToDollars = (cents: number | null) =>
-  cents == null ? "" : (cents / 100).toFixed(2)
+const centsToDollars = (cents: number | null) => (cents == null ? "" : toDollarInput(cents))
 
 export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentStepperProps) {
   const router = useRouter()
@@ -57,6 +76,14 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
     return 0
   })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+  // Focus lands on the step heading after a transition so keyboard/SR
+  // users aren't dropped to <body>; the heading is aria-live-announced.
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (mounted.current) headingRef.current?.focus()
+    else mounted.current = true
+  }, [step])
 
   const activeCards = useMemo(
     () => cards.filter((c) => c.lifecycle !== "ARCHIVED"),
@@ -71,7 +98,7 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
   }
 
   /** Persist the draft, then run `next` on success (advance / confirm). */
-  const persistDraft = (next: (intentId: string) => void) => {
+  const persistDraft = (next: (intentId: string) => Promise<void> | void) => {
     startTransition(async () => {
       const res = await saveIntentDraft({
         intentId: intentId ?? "",
@@ -82,12 +109,25 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
         note: fields.note,
       })
       if (!res.success || !res.intentId) {
-        setFieldErrors(res.fieldErrors ?? {})
+        // Another tab already recorded this draft — the flow is over.
+        if (res.rule === "already-submitted") {
+          toast.error(res.message)
+          router.push("/payments")
+          return
+        }
+        const errors = res.fieldErrors ?? {}
+        setFieldErrors(errors)
+        // Jump to the earliest step holding an errored field (a resumed
+        // draft whose date has passed must not brick a later step).
+        const steps = Object.keys(errors)
+          .map((k) => FIELD_STEP[k])
+          .filter((s) => s != null)
+        if (steps.length > 0) setStep(Math.min(...steps))
         toast.error(res.message)
         return
       }
       setIntentId(res.intentId)
-      next(res.intentId)
+      await next(res.intentId)
     })
   }
 
@@ -100,10 +140,12 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
 
   const handleContinue = () => persistDraft(() => setStep((s) => Math.min(2, s + 1)))
 
-  const handleConfirm = () => {
-    if (!intentId) return
-    startTransition(async () => {
-      const res = await confirmIntent(intentId)
+  // Confirm re-persists the on-screen fields first, so what the review
+  // shows is exactly what gets recorded — a cross-tab edit can't slip a
+  // different DB row under the user's confirmation (review finding).
+  const handleConfirm = () =>
+    persistDraft(async (id) => {
+      const res = await confirmIntent(id)
       if (!res.success) {
         if (res.rule === "expired" || res.rule === "not-found") {
           toast.error(res.message)
@@ -117,7 +159,6 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
       toast.success(res.message)
       router.push("/payments")
     })
-  }
 
   const handleDiscard = () => {
     startTransition(async () => {
@@ -155,19 +196,29 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
 
       <Card>
         <CardContent className="space-y-5 pt-6">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            aria-live="polite"
+            className="text-sm font-semibold outline-none"
+          >
+            Step {step + 1} of {STEPS.length}: {STEPS[step]}
+          </h2>
           {step === 0 && (
             <>
               <fieldset className="space-y-2">
                 <legend className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   Which card?
                 </legend>
-                <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1" role="radiogroup" aria-label="Card">
+                {/* Toggle buttons (aria-pressed), not radios — the app's
+                    segmented-control idiom; radio semantics would promise
+                    arrow-key roving this list doesn't implement. */}
+                <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
                   {activeCards.map((c) => (
                     <button
                       key={c.id}
                       type="button"
-                      role="radio"
-                      aria-checked={fields.cardId === c.id}
+                      aria-pressed={fields.cardId === c.id}
                       onClick={() => set({ cardId: c.id })}
                       data-testid="stepper-card-option"
                       className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
@@ -184,6 +235,11 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                     </button>
                   ))}
                 </div>
+                {error("cardId") && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {error("cardId")}
+                  </p>
+                )}
               </fieldset>
 
               <label className="block space-y-1.5">
@@ -202,10 +258,15 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                     className="pl-7 tabular-nums"
                     aria-label="Payment amount in dollars"
                     aria-invalid={error("amount") != null}
+                    aria-describedby={error("amount") ? "amount-error" : undefined}
                     data-testid="payment-amount"
                   />
                 </span>
-                {error("amount") && <p className="text-xs text-destructive">{error("amount")}</p>}
+                {error("amount") && (
+                  <p id="amount-error" className="text-xs text-destructive">
+                    {error("amount")}
+                  </p>
+                )}
                 {selectedCard?.minimumPaymentCents != null && (
                   <button
                     type="button"
@@ -232,10 +293,13 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   min={asOf}
                   className="tabular-nums"
                   aria-invalid={error("scheduledFor") != null}
+                  aria-describedby={error("scheduledFor") ? "scheduledFor-error" : undefined}
                   data-testid="payment-date"
                 />
                 {error("scheduledFor") && (
-                  <p className="text-xs text-destructive">{error("scheduledFor")}</p>
+                  <p id="scheduledFor-error" className="text-xs text-destructive">
+                    {error("scheduledFor")}
+                  </p>
                 )}
               </label>
 
@@ -270,9 +334,14 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   placeholder='e.g. "Statement Amt" or "$350/month"'
                   maxLength={200}
                   aria-invalid={error("note") != null}
+                  aria-describedby={error("note") ? "note-error" : undefined}
                   data-testid="payment-note"
                 />
-                {error("note") && <p className="text-xs text-destructive">{error("note")}</p>}
+                {error("note") && (
+                  <p id="note-error" className="text-xs text-destructive">
+                    {error("note")}
+                  </p>
+                )}
               </label>
             </>
           )}
@@ -293,9 +362,10 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                 />
                 <ReviewRow
                   label="Date"
+                  // Year included — the stepper schedules up to a year out.
                   value={
                     fields.scheduledFor
-                      ? formatMonthDay(new Date(`${fields.scheduledFor}T00:00:00Z`))
+                      ? formatShortDate(new Date(`${fields.scheduledFor}T00:00:00Z`))
                       : "—"
                   }
                   testid="review-date"
@@ -326,15 +396,33 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                 </button>
               )}
               {intentId && (
-                <button
-                  type="button"
-                  onClick={handleDiscard}
-                  disabled={pending}
-                  data-testid="stepper-discard"
-                  className="text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
-                >
-                  Start over
-                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      data-testid="stepper-discard"
+                      className="text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
+                    >
+                      Start over
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Everything entered so far is deleted — there&apos;s no undo. No payment
+                        has been recorded.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep draft</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDiscard} data-testid="stepper-discard-confirm">
+                        Discard
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
             {step < 2 ? (
@@ -364,7 +452,8 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
 
       {intentId && (
         <p className="text-xs text-muted-foreground">
-          Draft saved — resume any time in the next 24 hours; it expires after that.
+          Draft saved at each step — resume within 24 hours of the last save; unsaved edits on
+          the current step stay in this tab only.
         </p>
       )}
     </div>

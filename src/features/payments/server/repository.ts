@@ -28,6 +28,29 @@ export async function findScheduledPayments(householdId: string) {
   })
 }
 
+/**
+ * Verify draft foreign keys belong to the household (review finding —
+ * critical): the intent row's WHERE scopes only the intent; the cardId /
+ * fundingAccountId payload must be resolved through household-scoped
+ * lookups too, or a crafted save writes another household's ids and
+ * confirm records a payment onto their card (EDR-014).
+ */
+export async function verifyDraftReferences(
+  householdId: string,
+  cardId: string | null,
+  fundingAccountId: string | null
+): Promise<{ cardOk: boolean; accountOk: boolean }> {
+  const [card, account] = await Promise.all([
+    cardId == null
+      ? Promise.resolve(1)
+      : prisma.creditCard.count({ where: { id: cardId, householdId } }),
+    fundingAccountId == null
+      ? Promise.resolve(1)
+      : prisma.financialAccount.count({ where: { id: fundingAccountId, householdId } }),
+  ])
+  return { cardOk: card > 0, accountOk: account > 0 }
+}
+
 /** Funding-account labels for the stepper's picker — metadata, never balances (EDR-010). */
 export async function findFundingAccounts(householdId: string) {
   return prisma.financialAccount.findMany({
@@ -115,10 +138,12 @@ export async function findIntentWithPayment(householdId: string, intentId: strin
  * Record the ScheduledPayment for a complete draft and mark it SUBMITTED
  * — the idempotent record-only confirm (issue #45, EDR-010). The
  * `intentId @unique` constraint is the DB backstop: under a two-tab /
- * double-submit race every path lands on exactly one payment row —
- * whoever loses the create race reads the winner's row (P2002) and
- * returns it. Runs in one transaction so a SUBMITTED intent always has
- * its payment.
+ * double-submit race every path lands on exactly one payment row. The
+ * loser's recovery runs OUTSIDE the transaction — on Postgres a failed
+ * statement aborts the enclosing transaction, so an in-tx P2002 catch
+ * can never issue further statements (review finding); the pre-check
+ * inside the tx handles the sequential re-confirm, the outer catch
+ * handles the true concurrent race after rollback.
  */
 export async function recordPaymentForIntent(intent: {
   id: string
@@ -128,10 +153,21 @@ export async function recordPaymentForIntent(intent: {
   scheduledFor: Date
   note: string | null
 }): Promise<{ paymentId: string; alreadyRecorded: boolean }> {
-  return prisma.$transaction(async (tx) => {
-    let paymentId: string
-    let alreadyRecorded = false
-    try {
+  const markSubmitted = (client: Prisma.TransactionClient | typeof prisma) =>
+    client.paymentIntent.updateMany({
+      where: { id: intent.id, status: "DRAFT" },
+      data: { status: "SUBMITTED", submittedAt: new Date() },
+    })
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existing = await tx.scheduledPayment.findUnique({
+        where: { intentId: intent.id },
+        select: { id: true },
+      })
+      if (existing) {
+        await markSubmitted(tx)
+        return { paymentId: existing.id, alreadyRecorded: true }
+      }
       const payment = await tx.scheduledPayment.create({
         data: {
           cardId: intent.cardId,
@@ -143,26 +179,24 @@ export async function recordPaymentForIntent(intent: {
         },
         select: { id: true },
       })
-      paymentId = payment.id
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        const existing = await tx.scheduledPayment.findUnique({
-          where: { intentId: intent.id },
-          select: { id: true },
-        })
-        if (!existing) throw error
-        paymentId = existing.id
-        alreadyRecorded = true
-      } else {
-        throw error
+      await markSubmitted(tx)
+      return { paymentId: payment.id, alreadyRecorded: false }
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      // Lost the concurrent insert race: the winner committed. The aborted
+      // transaction has rolled back; recover on a fresh connection.
+      const existing = await prisma.scheduledPayment.findUnique({
+        where: { intentId: intent.id },
+        select: { id: true },
+      })
+      if (existing) {
+        await markSubmitted(prisma)
+        return { paymentId: existing.id, alreadyRecorded: true }
       }
     }
-    await tx.paymentIntent.updateMany({
-      where: { id: intent.id, status: "DRAFT" },
-      data: { status: "SUBMITTED", submittedAt: new Date() },
-    })
-    return { paymentId, alreadyRecorded }
-  })
+    throw error
+  }
 }
 
 /**

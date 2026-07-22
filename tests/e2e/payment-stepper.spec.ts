@@ -81,7 +81,9 @@ test("a draft resumes after reload and can be discarded", async ({ page }) => {
   await page.getByTestId("stepper-back").click()
   await expect(page.getByTestId("payment-amount")).toHaveValue("12.34")
 
+  // Discard requires an explicit confirmation dialog (destructive action).
   await page.getByTestId("stepper-discard").click()
+  await page.getByTestId("stepper-discard-confirm").click()
   await expect(page.getByText("Draft discarded.")).toBeVisible()
   await expect(page.getByTestId("payment-amount")).toHaveValue("")
 })
@@ -98,14 +100,44 @@ test("two-tab confirm converges on ONE payment (intentId unique backstop)", asyn
   await pageB.goto("/payments/new")
   await expect(pageB.getByTestId("stepper-review")).toBeVisible()
 
-  // A confirms first; B's confirm must be an idempotent no-op.
+  // A confirms first; B's confirm must be a refused no-op. (B is stopped
+  // at the persist-before-confirm gate — its confirm click re-saves the
+  // draft, the save sees SUBMITTED, and B leaves the flow; the service's
+  // SUBMITTED→idempotent-success branch backstops non-UI callers.)
   await page.getByTestId("stepper-confirm").click()
   await expect(page.getByText("Payment recorded.")).toBeVisible()
   await pageB.getByTestId("stepper-confirm").click()
-  await expect(pageB.getByText("This payment was already recorded.")).toBeVisible()
+  await expect(pageB.getByText(/already recorded/i)).toBeVisible()
   await expect(pageB).toHaveURL(/\/payments$/)
 
   // Exactly one chip exists for the amount — the DB backstop held.
+  await page.goto("/payments")
+  await expect(page.locator('[data-kind="scheduled"]', { hasText: `$${amount}` })).toHaveCount(1)
+  await pageB.close()
+})
+
+test("editing a draft another tab already recorded is refused, never re-drafted", async ({
+  context,
+  page,
+}) => {
+  const amount = "44.55"
+  await fillToReview(page, "Fern Cash", amount, daysOut(8))
+
+  // Tab B holds the same draft at review; tab A records it.
+  const pageB = await context.newPage()
+  await pageB.goto("/payments/new")
+  await expect(pageB.getByTestId("stepper-review")).toBeVisible()
+  await page.getByTestId("stepper-confirm").click()
+  await expect(page.getByText("Payment recorded.")).toBeVisible()
+
+  // Tab B goes Back and tries to keep editing → the save is refused with
+  // the already-recorded message and the tab leaves the flow (the silent
+  // fresh-draft fall-through double-recorded before the review fix).
+  await pageB.getByTestId("stepper-back").click()
+  await pageB.getByTestId("stepper-continue").click()
+  await expect(pageB.getByText(/already recorded/i)).toBeVisible()
+  await expect(pageB).toHaveURL(/\/payments$/)
+
   await page.goto("/payments")
   await expect(page.locator('[data-kind="scheduled"]', { hasText: `$${amount}` })).toHaveCount(1)
   await pageB.close()

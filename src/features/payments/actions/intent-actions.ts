@@ -28,6 +28,8 @@ export type SaveDraftState = {
   /** ISO timestamp the draft now expires at (sliding TTL). */
   expiresAt?: string
   fieldErrors?: Record<string, string[]>
+  /** Set when the draft was already confirmed — the stepper leaves the flow. */
+  rule?: "already-submitted"
 }
 
 export async function saveIntentDraft(input: Record<string, string>): Promise<SaveDraftState> {
@@ -52,6 +54,21 @@ export async function saveIntentDraft(input: Record<string, string>): Promise<Sa
       expiresAt: expiresAt.toISOString(),
     }
   } catch (error) {
+    if (error instanceof IntentRuleError) {
+      if (error.rule === "already-submitted") {
+        return { success: false, message: error.message, rule: "already-submitted" }
+      }
+      if (error.rule === "foreign-card") {
+        return { success: false, message: error.message, fieldErrors: { cardId: [error.message] } }
+      }
+      if (error.rule === "foreign-account") {
+        return {
+          success: false,
+          message: error.message,
+          fieldErrors: { fundingAccountId: [error.message] },
+        }
+      }
+    }
     console.error("saveIntentDraft failed:", error)
     return { success: false, message: "The draft could not be saved — please try again." }
   }
@@ -64,7 +81,7 @@ export type ConfirmIntentState = {
   /** True when this confirm found the payment already recorded (idempotent path). */
   alreadyRecorded?: boolean
   /** Set for rule failures the stepper can react to (e.g. send the user back). */
-  rule?: "expired" | "incomplete" | "not-found"
+  rule?: "expired" | "incomplete" | "not-found" | "foreign-card" | "foreign-account"
 }
 
 export async function confirmIntent(intentId: string): Promise<ConfirmIntentState> {
@@ -86,7 +103,7 @@ export async function confirmIntent(intentId: string): Promise<ConfirmIntentStat
       alreadyRecorded,
     }
   } catch (error) {
-    if (error instanceof IntentRuleError) {
+    if (error instanceof IntentRuleError && error.rule !== "already-submitted") {
       return { success: false, message: error.message, rule: error.rule }
     }
     console.error("confirmIntent failed:", error)
