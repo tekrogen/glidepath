@@ -187,8 +187,24 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   ? "border-success/50 text-muted-foreground"
                   : "border-border text-muted-foreground"
             }`}
+            onClick={i < step && !pending ? () => setStep(i) : undefined}
+            role={i < step ? "button" : undefined}
+            tabIndex={i < step ? 0 : undefined}
+            onKeyDown={
+              i < step
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      if (!pending) setStep(i)
+                    }
+                  }
+                : undefined
+            }
+            style={i < step ? { cursor: "pointer" } : undefined}
           >
-            <span className="font-mono tabular-nums">{i < step ? "✓" : i + 1}</span>
+            <span className={`font-mono tabular-nums ${i < step ? "text-success" : ""}`}>
+              {i < step ? "✓" : i + 1}
+            </span>
             <span className="hidden sm:inline">{label}</span>
           </li>
         ))}
@@ -228,15 +244,22 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                       }`}
                     >
                       <span className="min-w-0 flex-1 truncate font-medium">{c.cardName}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                      <span
+                        className={`shrink-0 text-xs tabular-nums ${
+                          fields.cardId === c.id ? "text-foreground" : "text-muted-foreground"
+                        }`}
+                      >
                         {formatMinor(c.balanceCents)}
                         {c.minimumPaymentCents != null && ` · min ${formatMinor(c.minimumPaymentCents)}`}
                       </span>
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {activeCards.length} cards — scroll for more
+                </p>
                 {error("cardId") && (
-                  <p className="text-xs text-destructive" role="alert">
+                  <p className="text-xs text-error-text" role="alert">
                     {error("cardId")}
                   </p>
                 )}
@@ -263,7 +286,7 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   />
                 </span>
                 {error("amount") && (
-                  <p id="amount-error" className="text-xs text-destructive">
+                  <p id="amount-error" role="alert" className="text-xs text-error-text">
                     {error("amount")}
                   </p>
                 )}
@@ -271,7 +294,7 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   <button
                     type="button"
                     onClick={() => set({ amount: centsToDollars(selectedCard.minimumPaymentCents) })}
-                    className="text-xs text-primary underline-offset-2 hover:underline"
+                    className="inline-flex min-h-6 items-center px-1 py-1 text-xs text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     Use minimum · {formatMinor(selectedCard.minimumPaymentCents)}
                   </button>
@@ -297,7 +320,7 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   data-testid="payment-date"
                 />
                 {error("scheduledFor") && (
-                  <p id="scheduledFor-error" className="text-xs text-destructive">
+                  <p id="scheduledFor-error" role="alert" className="text-xs text-error-text">
                     {error("scheduledFor")}
                   </p>
                 )}
@@ -338,7 +361,7 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   data-testid="payment-note"
                 />
                 {error("note") && (
-                  <p id="note-error" className="text-xs text-destructive">
+                  <p id="note-error" role="alert" className="text-xs text-error-text">
                     {error("note")}
                   </p>
                 )}
@@ -371,9 +394,12 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                   testid="review-date"
                 />
                 <ReviewRow label="Paid from" value={selectedAccount?.name ?? "Not set"} testid="review-funding" />
-                {fields.note.trim() !== "" && (
-                  <ReviewRow label="Note" value={fields.note} testid="review-note" />
-                )}
+                <ReviewRow
+                  label="Note"
+                  value={fields.note.trim() === "" ? "None" : fields.note}
+                  testid="review-note"
+                  wrap
+                />
               </dl>
               <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
                 Record-only: this tracks a payment you&apos;ll make yourself — nothing is charged,
@@ -402,7 +428,7 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
                       type="button"
                       disabled={pending}
                       data-testid="stepper-discard"
-                      className="text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
+                      className="inline-flex min-h-6 items-center px-1 py-1 text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
                       Start over
                     </button>
@@ -460,13 +486,27 @@ export function PaymentStepper({ cards, fundingAccounts, draft, asOf }: PaymentS
   )
 }
 
-function ReviewRow({ label, value, testid }: { label: string; value: string; testid: string }) {
+function ReviewRow({
+  label,
+  value,
+  testid,
+  wrap = false,
+}: {
+  label: string
+  value: string
+  testid: string
+  /** Free-text rows wrap in full — the user must read everything they confirm. */
+  wrap?: boolean
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </dt>
-      <dd className="min-w-0 truncate text-right tabular-nums" data-testid={testid}>
+      <dd
+        className={`min-w-0 text-right tabular-nums ${wrap ? "break-words" : "truncate"}`}
+        data-testid={testid}
+      >
         {value}
       </dd>
     </div>

@@ -39,6 +39,7 @@
   --warning-foreground: 0 0% 5%;
   --error: 0 84.2% 60.2%;
   --error-foreground: 0 0% 98%;
+  --error-text: 0 72% 38%; /* text-grade red: >=4.5:1 on card/background (design QA DS-001) */
 
   /* Countdown Timer Colors */
   --timer-safe: 142 76% 36%;
@@ -114,6 +115,7 @@
   --warning-foreground: 0 0% 5%;
   --error: 0 72% 55%;
   --error-foreground: 0 0% 98%;
+  --error-text: 0 90% 72%; /* text-grade red: >=4.5:1 on card/background (design QA DS-001) */
 
   /* Countdown Timer Colors - Dark Mode */
   --timer-safe: 142 70% 45%;

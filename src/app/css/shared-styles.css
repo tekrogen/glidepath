@@ -51,6 +51,7 @@
   --color-warning-foreground: hsl(var(--warning-foreground));
   --color-error: hsl(var(--error));
   --color-error-foreground: hsl(var(--error-foreground));
+  --color-error-text: hsl(var(--error-text));
 
   /* Timer colors */
   --color-timer-safe: hsl(var(--timer-safe));

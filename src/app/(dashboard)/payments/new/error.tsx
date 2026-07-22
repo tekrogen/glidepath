@@ -18,9 +18,11 @@ export default function NewPaymentError({ error, reset }: ErrorProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Schedule a payment</h1>
-        <p className="text-muted-foreground">Plan a payment on the 45-day runway</p>
+      <div className="border-b border-border pb-6">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          Payment scheduling
+        </p>
+        <h1 className="font-heading text-4xl font-bold tracking-tight">Schedule a payment</h1>
       </div>
 
       <Card>
