@@ -9,6 +9,7 @@
  * — Phase 3), keeping each row to date · card · amount so names render fully
  * (design QA).
  */
+import Link from "next/link"
 import { CalendarClock } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -70,7 +71,13 @@ export function UpcomingPaymentsWidget({ items }: { items: UpcomingPayment[] }) 
               </p>
             )}
             <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-              Scheduling &amp; autopay arrive with Payments.
+              <Link
+                href="/payments/new"
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                Schedule a payment
+              </Link>{" "}
+              — autopay arrives with reminders.
             </p>
           </>
         )}

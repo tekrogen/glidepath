@@ -18,7 +18,7 @@ import {
   portfolioSummary,
   type DebtStrategy,
 } from "@/lib/finance"
-import { formatMinor, formatShortDate } from "@/lib/formatting"
+import { formatMinor, formatShortDate, toDollarInput } from "@/lib/formatting"
 
 import type { LaneCard } from "./runway-view"
 
@@ -30,7 +30,7 @@ export function PayoffPlanPanel({ cards, asOf }: { cards: LaneCard[]; asOf: Date
   // lib/finance already owns (EDR-019: no re-derived sums in components).
   const defaultBudget = useMemo(() => {
     const minimums = portfolioSummary(cards, asOf).totalMinimumPaymentsMinor
-    return minimums > 0n ? (Number(minimums) / 100).toFixed(2) : ""
+    return minimums > 0n ? toDollarInput(minimums) : ""
   }, [cards, asOf])
   const [budget, setBudget] = useState(defaultBudget)
 

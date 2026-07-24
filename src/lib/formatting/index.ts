@@ -41,3 +41,9 @@ export function formatMonthDay(d: Date): string {
 export function formatStampDate(d: Date): string {
   return `${MONTHS[d.getUTCMonth()].toUpperCase()} ${d.getUTCDate()} ${d.getUTCFullYear()}`
 }
+
+/** "572.92" from 57292 — seeding a dollars text input (no symbol, no grouping). */
+export function toDollarInput(minor: bigint | number): string {
+  const cents = typeof minor === "bigint" ? Number(minor) : minor
+  return (cents / 100).toFixed(2)
+}

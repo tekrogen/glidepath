@@ -10,6 +10,7 @@
  * a toast on failure (the freeze-control idiom).
  */
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
 
 import {
@@ -163,18 +164,27 @@ export function RunwayView({ cards, payments, asOf }: RunwayViewProps) {
           </h1>
         </div>
 
-        <div
-          className="inline-flex rounded-md border border-border p-0.5"
-          role="group"
-          aria-label="Lane emphasis"
-          data-testid="runway-toggle"
-        >
-          <ModeChip active={mode === "due"} onClick={() => setMode("due")}>
-            By due date
-          </ModeChip>
-          <ModeChip active={mode === "close"} onClick={() => setMode("close")}>
-            By statement close
-          </ModeChip>
+        <div className="flex flex-wrap items-center gap-3">
+          <div
+            className="inline-flex rounded-md border border-border p-0.5"
+            role="group"
+            aria-label="Lane emphasis"
+            data-testid="runway-toggle"
+          >
+            <ModeChip active={mode === "due"} onClick={() => setMode("due")}>
+              By due date
+            </ModeChip>
+            <ModeChip active={mode === "close"} onClick={() => setMode("close")}>
+              By statement close
+            </ModeChip>
+          </div>
+          <Link
+            href="/payments/new"
+            data-testid="schedule-payment-cta"
+            className="inline-flex items-center justify-center rounded-md border border-primary/40 px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            Schedule payment
+          </Link>
         </div>
       </div>
 

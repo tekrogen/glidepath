@@ -18,8 +18,22 @@ import {
 import type { Lifecycle } from "@/features/cards/utils/card-status"
 import { emitDomainEvent } from "@/server/events/publishers"
 
+import type { IntentDraftInput } from "../schemas/intent-draft-schema"
+import { intentExpiresAt, isIntentExpired, validateIntentComplete } from "../utils/intent"
 import { toRunwayCard, toRunwayPayment } from "./mappers"
-import { findScheduledPayments, rescheduleScheduledPayment } from "./repository"
+import {
+  createDraft,
+  deleteDraft,
+  findActiveDraft,
+  findFundingAccounts,
+  findIntentWithPayment,
+  findScheduledPayments,
+  recordPaymentForIntent,
+  rescheduleScheduledPayment,
+  updateDraft,
+  verifyDraftReferences,
+  type IntentRow,
+} from "./repository"
 
 /** A runway lane's card: engine shape + what the lane label renders. */
 export interface RunwayPageCard extends RunwayCard {
@@ -62,6 +76,187 @@ export class RescheduleDateError extends Error {
   constructor(public readonly rule: "past" | "beyond-horizon") {
     super(`reschedule date rejected: ${rule}`)
   }
+}
+
+/** Thrown for user-facing intent rules — the action maps each to a specific result. */
+export class IntentRuleError extends Error {
+  constructor(
+    public readonly rule:
+      | "expired"
+      | "incomplete"
+      | "not-found"
+      | "already-submitted"
+      | "foreign-card"
+      | "foreign-account",
+    message: string
+  ) {
+    super(message)
+  }
+}
+
+export interface PaymentSetup {
+  cards: RunwayPageCard[]
+  fundingAccounts: Array<{
+    id: string
+    name: string
+    institution: string | null
+    lastFour: string | null
+  }>
+  /** The resumable un-expired DRAFT, if any. */
+  draft: IntentRow | null
+  asOf: Date
+}
+
+/** Everything /payments/new needs; empty when the user has no household. */
+export async function getPaymentSetup(userId: string, now = new Date()): Promise<PaymentSetup> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) {
+    return { cards: [], fundingAccounts: [], draft: null, asOf: now }
+  }
+  const [rows, fundingAccounts, draft] = await Promise.all([
+    findHouseholdCards(householdId),
+    findFundingAccounts(householdId),
+    findActiveDraft(householdId, now),
+  ])
+  const cards = rows.map((row) => ({
+    ...toRunwayCard(row),
+    cardName: row.cardName,
+    lifecycle: row.lifecycle as Lifecycle,
+  }))
+  return { cards, fundingAccounts, draft, asOf: now }
+}
+
+/**
+ * Save the stepper's draft (issue #45): updates the caller's live draft,
+ * reusing an existing one when the client has no id (two fresh tabs
+ * converge on one draft), creating one otherwise. Foreign-key payloads
+ * are resolved through household-scoped lookups first — the intent WHERE
+ * alone doesn't cover them (review finding, critical). A SUBMITTED
+ * intent is a hard stop, never a silent fresh draft: the ordinary
+ * two-tab flow would double-record through that fall-through (review
+ * finding). Only an EXPIRED/missing id falls through to a fresh draft.
+ * Every save re-arms the sliding TTL. Drafts are ephemeral: no event.
+ */
+export async function saveIntentDraftForUser(
+  userId: string,
+  input: IntentDraftInput,
+  now = new Date()
+): Promise<{ intentId: string; expiresAt: Date }> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) throw new Error("Not authorized")
+
+  const { cardOk, accountOk } = await verifyDraftReferences(
+    householdId,
+    input.cardId,
+    input.fundingAccountId
+  )
+  if (!cardOk) throw new IntentRuleError("foreign-card", "Pick one of your cards.")
+  if (!accountOk) throw new IntentRuleError("foreign-account", "Pick one of your funding accounts.")
+
+  const expiresAt = intentExpiresAt(now)
+  const fields = {
+    cardId: input.cardId,
+    fundingAccountId: input.fundingAccountId,
+    amountMinor: input.amount,
+    scheduledFor: input.scheduledFor,
+    note: input.note,
+  }
+
+  if (input.intentId != null) {
+    const updated = await updateDraft(householdId, input.intentId, fields, now, expiresAt)
+    if (updated > 0) return { intentId: input.intentId, expiresAt }
+    const existing = await findIntentWithPayment(householdId, input.intentId)
+    if (existing?.status === "SUBMITTED") {
+      throw new IntentRuleError(
+        "already-submitted",
+        "This payment was already recorded — start a new one."
+      )
+    }
+    // Expired or missing — fall through to a fresh draft.
+  } else {
+    // No client id: converge on the household's live draft if one exists
+    // (two fresh tabs must not mint sibling drafts — review finding). The
+    // residual both-find-none race is accepted, same posture as
+    // findOrCreateHouseholdForUser.
+    const active = await findActiveDraft(householdId, now)
+    if (active) {
+      const updated = await updateDraft(householdId, active.id, fields, now, expiresAt)
+      if (updated > 0) return { intentId: active.id, expiresAt }
+    }
+  }
+  const draft = await createDraft(householdId, expiresAt)
+  const updated = await updateDraft(householdId, draft.id, fields, now, expiresAt)
+  if (updated === 0) throw new Error("Draft could not be saved")
+  return { intentId: draft.id, expiresAt }
+}
+
+/** Discard a live draft (start-over). Missing/foreign ids are a no-op. */
+export async function discardIntentDraftForUser(userId: string, intentId: string): Promise<void> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) throw new Error("Not authorized")
+  await deleteDraft(householdId, intentId)
+}
+
+/**
+ * Record-only idempotent confirm (issue #45, EDR-010): validates the DB
+ * row (never client claims), then records the ScheduledPayment under the
+ * `intentId @unique` backstop — double-submit and two-tab confirms all
+ * converge on one payment row. Re-confirming an already-SUBMITTED intent
+ * returns its payment as an idempotent success. Audited through the
+ * events seam (once — the winner's path only).
+ */
+export async function confirmIntentForUser(
+  userId: string,
+  intentId: string,
+  now = new Date()
+): Promise<{ paymentId: string; alreadyRecorded: boolean }> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) throw new Error("Not authorized")
+
+  const intent = await findIntentWithPayment(householdId, intentId)
+  if (!intent) throw new IntentRuleError("not-found", "That draft no longer exists.")
+
+  if (intent.status === "SUBMITTED") {
+    if (intent.scheduledPayment) return { paymentId: intent.scheduledPayment.id, alreadyRecorded: true }
+    throw new Error(`SUBMITTED intent ${intentId} has no payment row`)
+  }
+  if (intent.status === "EXPIRED" || isIntentExpired(intent.expiresAt, now)) {
+    throw new IntentRuleError("expired", "This draft expired — start a new payment.")
+  }
+  const completeness = validateIntentComplete(intent, now)
+  if (!completeness.ok) throw new IntentRuleError("incomplete", completeness.message)
+
+  // Defense in depth: re-verify the FK targets at record time too — the
+  // draft was written under the same rule, but this is the money row.
+  const refs = await verifyDraftReferences(householdId, intent.cardId, intent.fundingAccountId)
+  if (!refs.cardOk) throw new IntentRuleError("foreign-card", "Pick one of your cards.")
+  if (!refs.accountOk) {
+    throw new IntentRuleError("foreign-account", "Pick one of your funding accounts.")
+  }
+
+  const { paymentId, alreadyRecorded } = await recordPaymentForIntent({
+    id: intent.id,
+    cardId: intent.cardId!,
+    fundingAccountId: intent.fundingAccountId,
+    amountMinor: intent.amountMinor!,
+    scheduledFor: intent.scheduledFor!,
+    note: intent.note,
+  })
+
+  if (!alreadyRecorded) {
+    await emitDomainEvent({
+      type: "PaymentScheduled",
+      userId,
+      householdId,
+      cardId: intent.cardId!,
+      cardName: intent.card?.cardName ?? "Card",
+      paymentId,
+      intentId: intent.id,
+      amountCents: Number(intent.amountMinor!),
+      scheduledFor: intent.scheduledFor!.toISOString().slice(0, 10),
+    })
+  }
+  return { paymentId, alreadyRecorded }
 }
 
 /**
