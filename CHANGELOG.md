@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/tekrogen/glidepath/compare/v1.2.0...v1.3.0) (2026-07-24)
+
+
+### Features
+
+* /payments/new stepper on DB-backed intents with idempotent record-only confirm ([#64](https://github.com/tekrogen/glidepath/issues/64)) ([0b7885a](https://github.com/tekrogen/glidepath/commit/0b7885a6429b28b51335c3138452b0fd70e83390)), closes [#45](https://github.com/tekrogen/glidepath/issues/45)
+* Payment Runway calendar page — lanes, toggle, cash chart, payoff plan, reschedule ([#62](https://github.com/tekrogen/glidepath/issues/62)) ([5a7ae8a](https://github.com/tekrogen/glidepath/commit/5a7ae8a21e82cf3e4017c29a8cc7fbda30318baa)), closes [#44](https://github.com/tekrogen/glidepath/issues/44)
+* Phase 3 payment-domain schema and seed fixture (SEED_VERSION 3) ([ab5c921](https://github.com/tekrogen/glidepath/commit/ab5c9219533360e77b441c05f4ecd759132ee7ea))
+* runway and debt-strategy engines in lib/finance (runwayAggregate, debtFreePlan) ([4c3bb2a](https://github.com/tekrogen/glidepath/commit/4c3bb2a0bb67ccd79fedafc3ffbb5c62a163d1ff))
+
+
+### Bug Fixes
+
+* allow the LAN-IP dev origin so pages hydrate on phones (dev:lan) ([0aff4b6](https://github.com/tekrogen/glidepath/commit/0aff4b6456d7e4da3c63cbe12ba9bc7f63e1c8af))
+
 ## [1.2.0](https://github.com/tekrogen/glidepath/compare/v1.1.0...v1.2.0) (2026-07-17)
 
 
