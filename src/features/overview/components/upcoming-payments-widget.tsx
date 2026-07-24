@@ -1,16 +1,15 @@
 /**
- * Upcoming-payments widget (issue #12, 0b wireframe) — the real feed. Server
- * component: rows arrive already built + sorted by buildUpcomingPayments;
- * cents are serialized here at the RSC boundary. The amount is the RECORDED
- * minimum, an actual — rendered plain with no "~"/EstimatedValue (EDR-020
- * reserves the estimate marker for estimates). The list is capped to the next
- * few due items with a muted "+ N more" tally; a single widget-footer note
- * stands in for per-row pay/autopay affordances (no payments model exists yet
- * — Phase 3), keeping each row to date · card · amount so names render fully
- * (design QA).
+ * Upcoming-payments widget (issue #12, 0b wireframe; PAY/AUTO chips per
+ * wireframe 1a — issue #46). Server component: rows arrive already built +
+ * sorted by buildUpcomingPayments; cents are serialized here at the RSC
+ * boundary. The amount is the RECORDED minimum, an actual — rendered plain
+ * with no "~"/EstimatedValue (EDR-020 reserves the estimate marker for
+ * estimates). Per-row affordances (EDR-016, record-only): confirmed
+ * provider autopay → muted "Auto ✓" chip; else a recorded issuer page →
+ * "Pay ↗" link-out. The list is capped with a muted "+ N more" tally.
  */
 import Link from "next/link"
-import { CalendarClock } from "lucide-react"
+import { CalendarClock, ExternalLink } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatMinor, formatShortDate } from "@/lib/formatting"
@@ -62,6 +61,27 @@ export function UpcomingPaymentsWidget({ items }: { items: UpcomingPayment[] }) 
                       formatMinor(Number(item.minimumPaymentMinor))
                     )}
                   </span>
+                  {item.autopayActive ? (
+                    <span
+                      className="shrink-0 rounded-full border border-success/50 bg-success/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-foreground"
+                      title="Autopay is set up at the issuer"
+                      data-testid="autopay-chip"
+                    >
+                      Auto ✓
+                    </span>
+                  ) : item.autopayProviderUrl ? (
+                    <a
+                      href={item.autopayProviderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      title="Pay at the issuer (opens in a new tab)"
+                      data-testid="pay-link"
+                    >
+                      Pay
+                      <ExternalLink className="h-3 w-3" aria-hidden />
+                    </a>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -77,7 +97,7 @@ export function UpcomingPaymentsWidget({ items }: { items: UpcomingPayment[] }) 
               >
                 Schedule a payment
               </Link>{" "}
-              — autopay arrives with reminders.
+              — Auto ✓ means autopay is confirmed at the issuer.
             </p>
           </>
         )}

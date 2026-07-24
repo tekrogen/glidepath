@@ -38,6 +38,7 @@ export type RunwayMode = "due" | "close"
 export interface LaneCard extends RunwayCard {
   cardName: string
   lifecycle: "ACTIVE" | "FROZEN" | "ARCHIVED"
+  autopayActive: boolean
 }
 
 const utcDay = (iso: string) => new Date(`${iso}T00:00:00Z`)
@@ -66,6 +67,7 @@ export function RunwayView({ cards, payments, asOf }: RunwayViewProps) {
           : null,
         paymentDueDay: c.paymentDueDay,
         statementCloseDay: c.statementCloseDay,
+        autopayActive: c.autopayActive,
       })),
     [cards]
   )

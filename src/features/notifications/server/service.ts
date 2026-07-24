@@ -9,6 +9,7 @@
  */
 import type { NotificationType } from "@prisma/client"
 import type { AttentionItem } from "@/features/overview/utils/build-attention-items"
+import type { ReminderItem } from "@/features/notifications/utils/build-reminder-items"
 
 import {
   countUnreadForUser,
@@ -16,6 +17,7 @@ import {
   findRecentForUser,
   markRead,
   replaceCurrentForUser,
+  type NotificationRow,
 } from "./repository"
 
 /** Plain-serializable — safe to cross the RSC → client boundary (no bigint, no Date). */
@@ -34,10 +36,19 @@ export interface NotificationPanel {
   unreadCount: number
 }
 
-export async function syncAttentionNotifications(userId: string, items: AttentionItem[]): Promise<void> {
-  await replaceCurrentForUser(
-    userId,
-    items.map((i) => ({
+/**
+ * Reconcile the store with the CURRENT occurrence set: attention items ∪
+ * payment reminders (issue #46). Shared dedupeKeys keep the attention
+ * item — reminders only add occurrences the feed doesn't already carry.
+ */
+export async function syncOccurrenceNotifications(
+  userId: string,
+  attention: AttentionItem[],
+  reminders: ReminderItem[]
+): Promise<void> {
+  const rows = new Map<string, NotificationRow>()
+  for (const i of [...reminders, ...attention]) {
+    rows.set(i.dedupeKey, {
       userId,
       type: i.type as NotificationType,
       entityRef: i.entityRef,
@@ -45,8 +56,9 @@ export async function syncAttentionNotifications(userId: string, items: Attentio
       title: i.title,
       body: i.body,
       href: i.href,
-    }))
-  )
+    })
+  }
+  await replaceCurrentForUser(userId, [...rows.values()])
 }
 
 export async function getNotificationPanel(userId: string): Promise<NotificationPanel> {

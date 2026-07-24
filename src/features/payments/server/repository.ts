@@ -122,6 +122,36 @@ export async function deleteDraft(householdId: string, intentId: string): Promis
   return result.count
 }
 
+/**
+ * Flip every stale DRAFT to EXPIRED (issue #46 cron; #45 deferred this).
+ * Global by design — the cron acts across households; returns the flipped
+ * rows with each household's members so the service can attribute the
+ * PaymentIntentExpired event to the household OWNER. The read + flip share
+ * a transaction so the returned set is exactly the flipped set.
+ */
+export async function expireStaleDrafts(now: Date) {
+  return prisma.$transaction(async (tx) => {
+    const stale = await tx.paymentIntent.findMany({
+      where: { status: "DRAFT", expiresAt: { lte: now } },
+      select: {
+        id: true,
+        householdId: true,
+        expiresAt: true,
+        household: {
+          select: { members: { select: { userId: true, role: true } } },
+        },
+      },
+    })
+    if (stale.length > 0) {
+      await tx.paymentIntent.updateMany({
+        where: { id: { in: stale.map((i) => i.id) } },
+        data: { status: "EXPIRED" },
+      })
+    }
+    return stale
+  })
+}
+
 /** An intent + its recorded payment, household-scoped — the confirm path's read. */
 export async function findIntentWithPayment(householdId: string, intentId: string) {
   return prisma.paymentIntent.findFirst({

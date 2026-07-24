@@ -152,6 +152,7 @@ function Lane({
             key={`${event.kind}-${event.paymentId ?? i}`}
             event={event}
             cardName={card?.cardName ?? "Card"}
+            autopayActive={card?.autopayActive ?? false}
             mode={mode}
             horizonDays={horizonDays}
             preview={preview}
@@ -181,6 +182,7 @@ const ROW_BOTTOM = "bottom-1.5"
 function EventChip({
   event,
   cardName,
+  autopayActive,
   mode,
   horizonDays,
   preview,
@@ -189,6 +191,8 @@ function EventChip({
 }: {
   event: RunwayEvent
   cardName: string
+  /** EDR-016 provider autopay — renders the Hi-Fi "auto ✓" cue on due chips. */
+  autopayActive: boolean
   mode: RunwayMode
   horizonDays: number
   preview: ReschedulePreview | null
@@ -228,8 +232,10 @@ function EventChip({
   }
 
   if (event.kind === "due") {
-    // Single-sourced urgency: the status engine's DUE_SOON rule (EDR-003).
-    const uncoveredSoon = !event.covered && event.daysFromToday <= DUE_SOON_DAYS
+    // Single-sourced urgency: the status engine's DUE_SOON rule (EDR-003);
+    // confirmed provider autopay counts as coverage (issue #46, EDR-016).
+    const autoCovered = autopayActive && !event.covered
+    const uncoveredSoon = !event.covered && !autopayActive && event.daysFromToday <= DUE_SOON_DAYS
     const amount =
       event.covered && (event.shortfallMinor === 0n || event.amountMinor == null)
         ? "covered"
@@ -244,7 +250,7 @@ function EventChip({
         className={`${base} ${ROW_BOTTOM} ${
           dimmed
             ? "border-border bg-card text-muted-foreground"
-            : event.covered
+            : event.covered || autoCovered
               ? "border-success/50 bg-success/10 text-foreground"
               : uncoveredSoon
                 ? "border-warning bg-warning/10 text-foreground"
@@ -258,6 +264,7 @@ function EventChip({
       >
         {event.covered && "✓ "}Due {formatMonthDay(event.date)}
         <span className="hidden lg:inline"> · {amount}</span>
+        {autoCovered && <span className="text-success"> · auto ✓</span>}
       </span>
     )
   }

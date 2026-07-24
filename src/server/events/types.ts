@@ -57,3 +57,12 @@ export type DomainEvent =
       amountCents: number
       scheduledFor: string
     }
+  | {
+      type: "PaymentIntentExpired"
+      /** The household OWNER's user (cron acts on the household's behalf). */
+      userId: string
+      householdId: string
+      intentId: string
+      /** ISO timestamp the draft expired at. */
+      expiredAt: string
+    }

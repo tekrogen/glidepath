@@ -19,11 +19,17 @@ import type { Lifecycle } from "@/features/cards/utils/card-status"
 import { emitDomainEvent } from "@/server/events/publishers"
 
 import type { IntentDraftInput } from "../schemas/intent-draft-schema"
-import { intentExpiresAt, isIntentExpired, validateIntentComplete } from "../utils/intent"
+import {
+  intentExpiresAt,
+  isIntentExpired,
+  resolveHouseholdEventUser,
+  validateIntentComplete,
+} from "../utils/intent"
 import { toRunwayCard, toRunwayPayment } from "./mappers"
 import {
   createDraft,
   deleteDraft,
+  expireStaleDrafts,
   findActiveDraft,
   findFundingAccounts,
   findIntentWithPayment,
@@ -38,7 +44,10 @@ import {
 /** A runway lane's card: engine shape + what the lane label renders. */
 export interface RunwayPageCard extends RunwayCard {
   cardName: string
+  lastFour: string | null
   lifecycle: Lifecycle
+  /** EDR-016: user confirmed autopay at the issuer — renders the "auto ✓" cue. */
+  autopayActive: boolean
 }
 
 export interface PaymentRunway {
@@ -62,7 +71,9 @@ export async function getPaymentRunway(userId: string, today = new Date()): Prom
   const cards = rows.map((row) => ({
     ...toRunwayCard(row),
     cardName: row.cardName,
+    lastFour: row.lastFour,
     lifecycle: row.lifecycle as Lifecycle,
+    autopayActive: row.autopayLink?.autopayActive ?? false,
   }))
   return {
     cards,
@@ -121,7 +132,9 @@ export async function getPaymentSetup(userId: string, now = new Date()): Promise
   const cards = rows.map((row) => ({
     ...toRunwayCard(row),
     cardName: row.cardName,
+    lastFour: row.lastFour,
     lifecycle: row.lifecycle as Lifecycle,
+    autopayActive: row.autopayLink?.autopayActive ?? false,
   }))
   return { cards, fundingAccounts, draft, asOf: now }
 }
@@ -188,6 +201,31 @@ export async function saveIntentDraftForUser(
   const updated = await updateDraft(householdId, draft.id, fields, now, expiresAt)
   if (updated === 0) throw new Error("Draft could not be saved")
   return { intentId: draft.id, expiresAt }
+}
+
+/**
+ * Expire stale DRAFT intents (issue #46 — the cron's job, deferred from
+ * #45). Flips DRAFT→EXPIRED transactionally, then emits one
+ * PaymentIntentExpired per intent, attributed to the household OWNER
+ * (events/audit require a userId; the cron has no session). A household
+ * with no user-bearing member skips the event — the flip still happened.
+ */
+export async function expireStaleIntents(
+  now = new Date()
+): Promise<{ expired: number }> {
+  const stale = await expireStaleDrafts(now)
+  for (const intent of stale) {
+    const userId = resolveHouseholdEventUser(intent.household.members)
+    if (!userId) continue
+    await emitDomainEvent({
+      type: "PaymentIntentExpired",
+      userId,
+      householdId: intent.householdId,
+      intentId: intent.id,
+      expiredAt: intent.expiresAt.toISOString(),
+    })
+  }
+  return { expired: stale.length }
 }
 
 /** Discard a live draft (start-over). Missing/foreign ids are a no-op. */

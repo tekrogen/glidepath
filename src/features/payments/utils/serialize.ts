@@ -21,6 +21,7 @@ export interface RunwayCardDto {
   } | null
   paymentDueDay: number | null
   statementCloseDay: number | null
+  autopayActive: boolean
 }
 
 export interface RunwayPaymentDto {
@@ -102,6 +103,7 @@ export function toRunwayViewProps(runway: PaymentRunway): RunwayViewProps {
         : null,
       paymentDueDay: c.paymentDueDay,
       statementCloseDay: c.statementCloseDay,
+      autopayActive: c.autopayActive,
     })),
     payments: runway.payments
       .filter((p) => p.status === "SCHEDULED")

@@ -15,11 +15,13 @@ const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   TrackerImported: "TRACKER_IMPORTED",
   PaymentRescheduled: "PAYMENT_RESCHEDULED",
   PaymentScheduled: "PAYMENT_SCHEDULED",
+  PaymentIntentExpired: "PAYMENT_INTENT_EXPIRED",
 }
 
 const PAYMENT_EVENTS: ReadonlySet<DomainEvent["type"]> = new Set([
   "PaymentRescheduled",
   "PaymentScheduled",
+  "PaymentIntentExpired",
 ])
 
 /** Event-shaped audit details — the tracker import has no single card. */
@@ -53,6 +55,13 @@ function auditDetails(event: DomainEvent): string {
       intentId: event.intentId,
       amountCents: event.amountCents,
       scheduledFor: event.scheduledFor,
+    })
+  }
+  if (event.type === "PaymentIntentExpired") {
+    return JSON.stringify({
+      householdId: event.householdId,
+      intentId: event.intentId,
+      expiredAt: event.expiredAt,
     })
   }
   return JSON.stringify({
