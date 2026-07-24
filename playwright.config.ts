@@ -59,7 +59,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['authenticated'],
-      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts|import-tracker\.spec\.ts|reschedule-payment\.spec\.ts|payment-stepper\.spec\.ts/,
+      testMatch: /add-card\.spec\.ts|freeze-card\.spec\.ts|import-tracker\.spec\.ts|reschedule-payment\.spec\.ts|payment-stepper\.spec\.ts|payment-reminders\.spec\.ts/,
     },
 
     // First-run / empty states (issue #29). Runs as a separate card-less user
@@ -85,6 +85,8 @@ export default defineConfig({
       ENABLE_DEMO_AUTH: 'true',
       NEXT_PUBLIC_ENABLE_DEMO_AUTH: 'true',
       NEXTAUTH_URL: 'http://localhost:6014',
+      // Must match payment-reminders.spec.ts (intent-expiry cron e2e).
+      CRON_SECRET: 'e2e-cron-secret',
     },
   },
 });

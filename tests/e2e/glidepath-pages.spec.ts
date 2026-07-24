@@ -5,6 +5,11 @@
  */
 import { expect, test } from "@playwright/test"
 
+import { SEED_CARDS } from "../../prisma/seed-data/glidepath-cards"
+
+const usd = (minor: bigint) =>
+  (Number(minor) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })
+
 test.describe("Overview page", () => {
   test("v2 header: hero total balance is the h1, with a utilization chip", async ({ page }) => {
     await page.goto("/overview")
@@ -37,8 +42,16 @@ test.describe("Overview page", () => {
     await expect(page.getByText("Upcoming payments")).toBeVisible()
     const rows = page.getByTestId("upcoming-payment")
     await expect(rows.first()).toBeVisible()
-    // Known card→amount pairing (recorded minimum, rendered plain — no "~").
-    await expect(rows.filter({ hasText: "Meridian Blue" })).toContainText("$85.00")
+    // Card→amount pairing against the fixture, DATE-INDEPENDENTLY: which six
+    // cards are "next due" rotates with the calendar (a pinned "Meridian ·
+    // $85.00" row aged out of the visible cap and failed — 2026-07-24), so
+    // assert the FIRST row's amount matches ITS card's recorded minimum.
+    const firstName = (await rows.first().locator("p").first().textContent())?.trim()
+    const seedCard = SEED_CARDS.find((c) => c.cardName === firstName)
+    expect(seedCard, `first upcoming row "${firstName}" must be a seed card`).toBeDefined()
+    await expect(rows.first()).toContainText(
+      seedCard!.minimumPaymentMinor == null ? "Min not set" : usd(seedCard!.minimumPaymentMinor)
+    )
     // A card with no due day (Cedar Line) never appears.
     await expect(rows.filter({ hasText: "Cedar Line" })).toHaveCount(0)
     // Ordering is ascending by due date — assert structurally, not by fixed date.

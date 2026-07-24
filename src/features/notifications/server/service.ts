@@ -1,7 +1,8 @@
 /**
- * Notifications service — persists attention items as in-app notifications
- * (issue #25). Occurrence-lifecycle semantics (F15): the store always holds
- * exactly the CURRENT attention occurrences with their read/dismiss state.
+ * Notifications service — persists the current occurrence set (attention
+ * items ∪ payment reminders, issues #25/#46) as in-app notifications.
+ * Occurrence-lifecycle semantics (F15): the store always holds exactly
+ * the CURRENT occurrences with their read/dismiss state.
  * A re-sync of the same occurrence (same dedupeKey) keeps that state; an
  * occurrence that resolves or rolls over is deleted — dismissed or not — so
  * a new episode of the same condition re-notifies, while a dismissal
@@ -9,6 +10,7 @@
  */
 import type { NotificationType } from "@prisma/client"
 import type { AttentionItem } from "@/features/overview/utils/build-attention-items"
+import type { ReminderItem } from "@/features/notifications/utils/build-reminder-items"
 
 import {
   countUnreadForUser,
@@ -16,6 +18,7 @@ import {
   findRecentForUser,
   markRead,
   replaceCurrentForUser,
+  type NotificationRow,
 } from "./repository"
 
 /** Plain-serializable — safe to cross the RSC → client boundary (no bigint, no Date). */
@@ -34,10 +37,19 @@ export interface NotificationPanel {
   unreadCount: number
 }
 
-export async function syncAttentionNotifications(userId: string, items: AttentionItem[]): Promise<void> {
-  await replaceCurrentForUser(
-    userId,
-    items.map((i) => ({
+/**
+ * Reconcile the store with the CURRENT occurrence set: attention items ∪
+ * payment reminders (issue #46). Shared dedupeKeys keep the attention
+ * item — reminders only add occurrences the feed doesn't already carry.
+ */
+export async function syncOccurrenceNotifications(
+  userId: string,
+  attention: AttentionItem[],
+  reminders: ReminderItem[]
+): Promise<void> {
+  const rows = new Map<string, NotificationRow>()
+  for (const i of [...reminders, ...attention]) {
+    rows.set(i.dedupeKey, {
       userId,
       type: i.type as NotificationType,
       entityRef: i.entityRef,
@@ -45,8 +57,9 @@ export async function syncAttentionNotifications(userId: string, items: Attentio
       title: i.title,
       body: i.body,
       href: i.href,
-    }))
-  )
+    })
+  }
+  await replaceCurrentForUser(userId, [...rows.values()])
 }
 
 export async function getNotificationPanel(userId: string): Promise<NotificationPanel> {

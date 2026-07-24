@@ -16,7 +16,9 @@ const runway: PaymentRunway = {
     {
       id: "card-1",
       cardName: "Meridian Blue",
+      lastFour: "4412",
       lifecycle: "ACTIVE",
+      autopayActive: true,
       balanceMinor: 214000n,
       limitMinor: 500000n,
       regularAprBps: 1924,
@@ -32,7 +34,9 @@ const runway: PaymentRunway = {
     {
       id: "card-2",
       cardName: "Coastal CU",
+      lastFour: null,
       lifecycle: "FROZEN",
+      autopayActive: false,
       balanceMinor: 0n,
       limitMinor: null,
       regularAprBps: null,
@@ -76,6 +80,7 @@ describe("toRunwayViewProps", () => {
       promo: { endsOn: "2027-02-01", shelteredBalanceCents: 423400, regularAprBpsAfter: 2699 },
       paymentDueDay: 22,
       statementCloseDay: 27,
+      autopayActive: true,
     })
   })
 

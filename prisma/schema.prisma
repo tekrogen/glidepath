@@ -228,6 +228,7 @@ enum NotificationType {
   HIGH_UTILIZATION
   DUE_SOON
   SYNC_FAILED
+  PAYMENT_REMINDER // an imminent SCHEDULED payment the user planned (issue #46)
 }
 
 model Notification {

@@ -45,8 +45,14 @@ test.describe("Notification bell", () => {
     await expect(rows.first()).toBeVisible()
 
     // Activating an unread row marks it read, closes the panel, and follows
-    // the item's href; the unread count decreases.
-    const unreadRow = page.locator('[data-testid="notification-row"][data-read="false"]').first()
+    // the item's href; the unread count decreases. Target a High-utilization
+    // row explicitly — since #46 the store mixes attention rows (href /cards)
+    // with reminder rows (href /payments), and same-transaction createdAt
+    // makes "first unread" nondeterministic across types.
+    const unreadRow = page
+      .locator('[data-testid="notification-row"][data-read="false"]')
+      .filter({ hasText: "High utilization" })
+      .first()
     await unreadRow.locator("button").first().click()
     await expect(page).toHaveURL(/\/cards/)
     await expect(
