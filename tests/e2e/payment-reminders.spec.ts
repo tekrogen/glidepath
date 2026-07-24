@@ -1,36 +1,72 @@
 /**
  * Payment reminders + autopay affordances + intent-expiry cron (issue
- * #46). Date-independent by construction: the seed's due days leave no
- * gap over 7 days and its no-coverage cards (no autopay, no payments)
- * guarantee at least one uncovered in-window due at ANY run date; the
- * PAYMENT_REMINDER case inserts its own row at today+2; the cron case
- * inserts its own stale draft.
+ * #46). Date-independent by construction: date-sensitive expectations
+ * are predicted with the app's own engines at the run date (all-covered
+ * windows exist — e.g. 2026-07-20 — so nothing is asserted
+ * unconditionally unless this spec inserts the row itself: the today+2
+ * planned payment and the stale draft).
  */
 import { execSync } from "node:child_process"
 
 import { expect, test } from "@playwright/test"
 
 import { SEED_CARDS } from "../../prisma/seed-data/glidepath-cards"
+import { SEED_AUTOPAY_LINKS, SEED_SCHEDULED_PAYMENTS } from "../../prisma/seed-data/glidepath-payments"
+import { nextDueDate } from "../../src/features/cards/utils/due-dates"
+import {
+  buildReminderItems,
+  type ReminderCard,
+} from "../../src/features/notifications/utils/build-reminder-items"
+import type { RunwayPayment } from "../../src/lib/finance"
 
 /**
- * The overview widget shows the SIX soonest dues, which rotate with the
- * calendar — whether a specific card's row is visible is date-dependent.
- * Recompute the visible set from the seed (same next-due rule as the app)
- * so chip assertions only run when their row is actually rendered; the
- * runway cue below covers the autopay data path on every run.
+ * Date-dependent expectations are PREDICTED with the app's own engines
+ * (review finding: a hand-rolled copy of the cap/claim rules diverges) —
+ * nextDueDate for the widget's six-row cap, buildReminderItems for which
+ * reminder rows exist at the run date. The seed-derived inputs mirror
+ * tests/unit/notifications/build-reminder-items.test.ts.
  */
+const WIDGET_CAP = 6 // = UPCOMING_LIMIT in upcoming-payments-widget.tsx
+
 function visibleUpcomingNames(today: Date): Set<string> {
-  const upcoming = SEED_CARDS.filter((c) => c.paymentDueDay != null).map((c) => {
-    const y = today.getUTCFullYear()
-    const m = today.getUTCMonth()
-    const thisMonth = new Date(Date.UTC(y, m, Math.min(c.paymentDueDay!, new Date(Date.UTC(y, m + 1, 0)).getUTCDate())))
-    const due = thisMonth >= new Date(Date.UTC(y, m, today.getUTCDate()))
-      ? thisMonth
-      : new Date(Date.UTC(y, m + 1, Math.min(c.paymentDueDay!, new Date(Date.UTC(y, m + 2, 0)).getUTCDate())))
-    return { name: c.cardName, due }
-  })
+  const upcoming = SEED_CARDS.filter((c) => c.paymentDueDay != null)
+    .map((c) => ({ name: c.cardName, due: nextDueDate(c.paymentDueDay, today)! }))
+    .filter((u) => u.due != null)
   upcoming.sort((a, b) => a.due.getTime() - b.due.getTime() || a.name.localeCompare(b.name))
-  return new Set(upcoming.slice(0, 6).map((u) => u.name))
+  return new Set(upcoming.slice(0, WIDGET_CAP).map((u) => u.name))
+}
+
+const utc = (s: string) => new Date(`${s}T00:00:00Z`)
+const AUTOPAY_ACTIVE = new Set(
+  SEED_AUTOPAY_LINKS.filter((a) => a.autopayActive).map((a) => a.cardName)
+)
+
+/** Seed-derived reminder prediction at the run date (fixture payments only —
+ *  the spec's own $43.00 row is asserted unconditionally on top). */
+function predictedSeedReminders(today: Date) {
+  const cards: ReminderCard[] = SEED_CARDS.map((c) => ({
+    id: c.cardName,
+    cardName: c.cardName,
+    lastFour: c.lastFour,
+    balanceMinor: c.currentBalanceMinor,
+    limitMinor: c.creditLimitMinor,
+    regularAprBps: c.regularAprBps,
+    minimumPaymentMinor: c.minimumPaymentMinor,
+    promo: c.promo
+      ? { endsOn: utc(c.promo.endsOn), shelteredBalanceMinor: c.currentBalanceMinor, regularAprBpsAfter: c.promo.regularAprBpsAfter }
+      : null,
+    paymentDueDay: c.paymentDueDay,
+    statementCloseDay: c.statementCloseDay ?? null,
+    autopayActive: AUTOPAY_ACTIVE.has(c.cardName),
+  }))
+  const payments: RunwayPayment[] = SEED_SCHEDULED_PAYMENTS.map((p, i) => ({
+    id: `seed-${i}`,
+    cardId: p.cardName,
+    amountMinor: p.amountMinor,
+    scheduledFor: utc(p.scheduledFor),
+    status: p.status,
+  }))
+  return buildReminderItems(cards, payments, today)
 }
 
 // Must match playwright.config.ts webServer.env.CRON_SECRET.
@@ -55,11 +91,16 @@ test("due-date and planned-payment reminders land in the notification panel", as
   await page.goto("/overview")
   await page.getByRole("button", { name: /Notifications \(/ }).click()
 
-  // Exit criterion: a due-date occurrence from the seeded fixture…
-  await expect(
-    page.getByTestId("notification-row").filter({ hasText: "Payment due soon" }).first()
-  ).toBeVisible()
-  // …and the $42.00 payment inserted at today+2 reminds as planned.
+  // Exit criterion: due-date occurrences from the seeded fixture appear —
+  // asserted when the engine predicts any at the run date (rare all-covered
+  // windows exist, e.g. 2026-07-20; review finding).
+  const predicted = predictedSeedReminders(new Date())
+  if (predicted.some((i) => i.type === "DUE_SOON")) {
+    await expect(
+      page.getByTestId("notification-row").filter({ hasText: "Payment due soon" }).first()
+    ).toBeVisible()
+  }
+  // ALWAYS asserted: the $43.00 payment this spec inserts at today+2.
   await expect(
     page.getByTestId("notification-row").filter({ hasText: "Planned payment in 2 days" })
   ).toBeVisible()

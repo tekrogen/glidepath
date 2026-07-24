@@ -82,12 +82,15 @@ export function buildReminderItems(
     const event = lane?.events.find((e) => e.kind === "scheduled" && e.paymentId === payment.id)
     if (!event || event.daysFromToday > PAYMENT_REMINDER_LEAD_DAYS) continue
     const when = event.daysFromToday === 0 ? "today" : event.daysFromToday === 1 ? "tomorrow" : `in ${event.daysFromToday} days`
+    // A planned payment on an autopay-armed card risks a double payment at
+    // the issuer — state both facts (record-only: informs, moves nothing).
+    const autopayNote = card.autopayActive ? " Autopay is also confirmed at the issuer." : ""
     items.push({
       type: "PAYMENT_REMINDER",
       entityRef: `card:${card.id}`,
       dedupeKey: `PAYMENT_REMINDER:payment:${payment.id}:${isoDate(payment.scheduledFor)}`,
       title: `Planned payment ${when}`,
-      body: `${label(card)} — you planned ${formatMinor(payment.amountMinor)} on ${formatShortDate(payment.scheduledFor)}.`,
+      body: `${label(card)} — you planned ${formatMinor(payment.amountMinor)} on ${formatShortDate(payment.scheduledFor)}.${autopayNote}`,
       href: "/payments",
     })
   }

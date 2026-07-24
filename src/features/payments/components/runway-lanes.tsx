@@ -264,7 +264,8 @@ function EventChip({
       >
         {event.covered && "✓ "}Due {formatMonthDay(event.date)}
         <span className="hidden lg:inline"> · {amount}</span>
-        {autoCovered && <span className="text-success"> · auto ✓</span>}
+        {/* Chip contract: text stays foreground — the success border+tint carry the hue (design QA DS-007). */}
+        {autoCovered && <span> · auto ✓</span>}
       </span>
     )
   }

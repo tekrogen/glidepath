@@ -18,8 +18,6 @@ export interface UpcomingPayment {
   /** Recorded minimum (bigint minor units); null when not set. Serialize at
    *  the RSC boundary before it reaches any client component. */
   minimumPaymentMinor: bigint | null
-  /** Autopay or a claiming scheduled payment covers this due (issue #46). */
-  dueCovered: boolean
   /** EDR-016 provider metadata → the AUTO chip / PAY link-out. */
   autopayActive: boolean
   autopayProviderUrl: string | null
@@ -44,7 +42,6 @@ export function buildUpcomingPayments(cards: PortfolioCard[], asOf: Date): Upcom
       dueDate,
       dueInDays: card.dueInDays,
       minimumPaymentMinor: card.finance.minimumPaymentMinor,
-      dueCovered: card.dueCovered,
       autopayActive: card.autopayActive,
       autopayProviderUrl: card.autopayProviderUrl,
     })

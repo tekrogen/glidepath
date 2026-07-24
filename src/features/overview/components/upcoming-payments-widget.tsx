@@ -61,27 +61,35 @@ export function UpcomingPaymentsWidget({ items }: { items: UpcomingPayment[] }) 
                       formatMinor(Number(item.minimumPaymentMinor))
                     )}
                   </span>
-                  {item.autopayActive ? (
-                    <span
-                      className="shrink-0 rounded-full border border-success/50 bg-success/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-foreground"
-                      title="Autopay is set up at the issuer"
-                      data-testid="autopay-chip"
-                    >
-                      Auto ✓
-                    </span>
-                  ) : item.autopayProviderUrl ? (
-                    <a
-                      href={item.autopayProviderUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      title="Pay at the issuer (opens in a new tab)"
-                      data-testid="pay-link"
-                    >
-                      Pay
-                      <ExternalLink className="h-3 w-3" aria-hidden />
-                    </a>
-                  ) : null}
+                  {/* Fixed trailing slot keeps the amount column's right axis
+                      whether or not a chip renders (design QA DS-010); chip
+                      TEXT stays foreground per the AA chip contract (DS-008). */}
+                  <span className="flex w-16 shrink-0 justify-end">
+                    {item.autopayActive ? (
+                      <span
+                        className="rounded-full border border-success/50 bg-success/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-foreground"
+                        title="Autopay is set up at the issuer"
+                        data-testid="autopay-chip"
+                      >
+                        Auto ✓
+                      </span>
+                    ) : item.autopayProviderUrl ? (
+                      <a
+                        href={item.autopayProviderUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-foreground hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        title="Pay at the issuer (opens in a new tab)"
+                        data-testid="pay-link"
+                      >
+                        Pay
+                        <ExternalLink className="h-3 w-3 text-primary" aria-hidden />
+                        <span className="sr-only">
+                          {item.cardName} at the issuer (opens in a new tab)
+                        </span>
+                      </a>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>

@@ -11,8 +11,11 @@ import { expireStaleIntents } from "@/features/payments/server/service"
  *
  * Schedule suggestion: hourly.
  * vercel.json: { "path": "/api/cron/intent-expiry", "schedule": "0 * * * *" }
+ * Vercel Cron invokes with GET (review finding); external schedulers may
+ * POST — both are exported over the same handler. (plaid-cleanup has the
+ * same latent GET gap — tracked separately.)
  */
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const cronSecret = process.env.CRON_SECRET
 
   if (!cronSecret) {
@@ -40,3 +43,5 @@ export async function POST(request: Request) {
     )
   }
 }
+
+export { handle as GET, handle as POST }

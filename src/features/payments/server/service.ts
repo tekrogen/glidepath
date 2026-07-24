@@ -30,6 +30,7 @@ import {
   createDraft,
   deleteDraft,
   expireStaleDrafts,
+  IntentStateConflictError,
   findActiveDraft,
   findFundingAccounts,
   findIntentWithPayment,
@@ -272,14 +273,24 @@ export async function confirmIntentForUser(
     throw new IntentRuleError("foreign-account", "Pick one of your funding accounts.")
   }
 
-  const { paymentId, alreadyRecorded } = await recordPaymentForIntent({
-    id: intent.id,
-    cardId: intent.cardId!,
-    fundingAccountId: intent.fundingAccountId,
-    amountMinor: intent.amountMinor!,
-    scheduledFor: intent.scheduledFor!,
-    note: intent.note,
-  })
+  let paymentId: string
+  let alreadyRecorded: boolean
+  try {
+    ;({ paymentId, alreadyRecorded } = await recordPaymentForIntent({
+      id: intent.id,
+      cardId: intent.cardId!,
+      fundingAccountId: intent.fundingAccountId,
+      amountMinor: intent.amountMinor!,
+      scheduledFor: intent.scheduledFor!,
+      note: intent.note,
+    }))
+  } catch (error) {
+    if (error instanceof IntentStateConflictError) {
+      // The expiry cron won the race mid-confirm; the payment rolled back.
+      throw new IntentRuleError("expired", "This draft expired just now — start a new payment.")
+    }
+    throw error
+  }
 
   if (!alreadyRecorded) {
     await emitDomainEvent({

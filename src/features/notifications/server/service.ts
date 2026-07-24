@@ -1,7 +1,8 @@
 /**
- * Notifications service — persists attention items as in-app notifications
- * (issue #25). Occurrence-lifecycle semantics (F15): the store always holds
- * exactly the CURRENT attention occurrences with their read/dismiss state.
+ * Notifications service — persists the current occurrence set (attention
+ * items ∪ payment reminders, issues #25/#46) as in-app notifications.
+ * Occurrence-lifecycle semantics (F15): the store always holds exactly
+ * the CURRENT occurrences with their read/dismiss state.
  * A re-sync of the same occurrence (same dedupeKey) keeps that state; an
  * occurrence that resolves or rolls over is deleted — dismissed or not — so
  * a new episode of the same condition re-notifies, while a dismissal

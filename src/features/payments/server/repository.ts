@@ -13,6 +13,13 @@ import type { Minor } from "@/lib/finance"
 
 export type ScheduledPaymentRow = Awaited<ReturnType<typeof findScheduledPayments>>[number]
 
+/** The intent left DRAFT mid-confirm (expiry-cron race) — the caller maps this to a user-facing retry. */
+export class IntentStateConflictError extends Error {
+  constructor(intentId: string) {
+    super(`intent ${intentId} left DRAFT during confirm`)
+  }
+}
+
 /** Unresolved SCHEDULED rows for the household's cards; window filtering is the engine's job. */
 export async function findScheduledPayments(householdId: string) {
   return prisma.scheduledPayment.findMany({
@@ -142,13 +149,20 @@ export async function expireStaleDrafts(now: Date) {
         },
       },
     })
-    if (stale.length > 0) {
-      await tx.paymentIntent.updateMany({
-        where: { id: { in: stale.map((i) => i.id) } },
+    // Per-row flip with a status guard: at Read Committed a confirm can
+    // commit SUBMITTED between the read and the write, and an id-only
+    // updateMany would stomp it to EXPIRED — breaking the idempotent
+    // re-confirm branch and the money record (review finding). Only rows
+    // WE actually flipped are returned, so events match reality.
+    const flipped: typeof stale = []
+    for (const intent of stale) {
+      const res = await tx.paymentIntent.updateMany({
+        where: { id: intent.id, status: "DRAFT" },
         data: { status: "EXPIRED" },
       })
+      if (res.count === 1) flipped.push(intent)
     }
-    return stale
+    return flipped
   })
 }
 
@@ -209,7 +223,14 @@ export async function recordPaymentForIntent(intent: {
         },
         select: { id: true },
       })
-      await markSubmitted(tx)
+      const submitted = await markSubmitted(tx)
+      if (submitted.count === 0) {
+        // The intent left DRAFT under us (e.g. the expiry cron flipped it
+        // EXPIRED between the service's read and this write) — roll the
+        // payment back rather than record money against a dead intent
+        // (review finding).
+        throw new IntentStateConflictError(intent.id)
+      }
       return { paymentId: payment.id, alreadyRecorded: false }
     })
   } catch (error) {
