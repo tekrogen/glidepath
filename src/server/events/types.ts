@@ -57,6 +57,18 @@ export type DomainEvent =
       cardCount: number
     }
   | {
+      type: "MonarchBalancesImported"
+      userId: string
+      householdId: string
+      /** yyyy-mm-dd — the export's newest data date. */
+      asOfDate: string
+      updated: number
+      changed: number
+      mappingsSaved: number
+      skippedAccounts: number
+      unmatchedAccounts: number
+    }
+  | {
       type: "PaymentRescheduled"
       userId: string
       householdId: string

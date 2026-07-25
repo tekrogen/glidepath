@@ -236,6 +236,15 @@ export default async function SettingsPage() {
             </div>
             <div className="flex items-center justify-between">
               <div>
+                <div className="font-medium">Monarch Balances</div>
+                <div className="text-sm text-gray-500">Refresh card balances from a Monarch CSV export</div>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/cards/import?source=monarch">Import Balances</Link>
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
                 <div className="font-medium">Data Export</div>
                 <div className="text-sm text-gray-500">Download all your financial data</div>
               </div>

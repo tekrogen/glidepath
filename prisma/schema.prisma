@@ -446,9 +446,15 @@ model CreditCard {
   minimumSource FieldSource @default(UNKNOWN)
 
   userAccountId String? // optional aggregator link
-  notes         String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  // Verbatim Monarch "Account" string, e.g. "Quicksilver (...8391)" — the ONLY
+  // re-run match key for Monarch balance imports (#48): suffixes collide
+  // (7727 ×2 in real data), display names collide ("Credit Card" ×2) — the
+  // full string is the export's only unique identifier. Never key on
+  // last-four alone.
+  monarchAccountKey String?
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   household         Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
   ownerMember       HouseholdMember?     @relation("CardOwner", fields: [ownerMemberId], references: [id], onDelete: SetNull)
@@ -460,6 +466,9 @@ model CreditCard {
   autopayLink       ProviderAutopayLink?
 
   @@index([householdId])
+  // Race backstop for concurrent Monarch imports: one card per account key
+  // per household (Postgres treats NULLs as distinct — unkeyed cards free).
+  @@unique([householdId, monarchAccountKey])
 }
 
 // Inside the CreditCard aggregate — edited with the card (EDR-017).

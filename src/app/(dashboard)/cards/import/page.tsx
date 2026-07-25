@@ -1,15 +1,24 @@
 /**
- * Tracker import (issue #28, EDR-021 step 2). Server shell for the wizard:
- * sign-in + financial:write gate (the actions enforce it again server-side),
- * page header per the Cards idiom.
+ * Card imports (issue #28 tracker · issue #48 Monarch balances). Server
+ * shell for the two wizards behind a source selector: the proven tracker
+ * flow stays untouched; the Monarch balances flow updates balances on
+ * existing cards only. `?source=monarch` selects the second tab
+ * (Settings deep-links it). Sign-in + financial:write gate — the actions
+ * enforce it again server-side.
  */
 import { redirect } from "next/navigation"
 
 import { auth } from "@/lib/auth"
 import { hasPermission } from "@/lib/auth/constants"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ImportMonarchWizard } from "@/features/cards/components/import-monarch-wizard"
 import { ImportTrackerWizard } from "@/features/cards/components/import-tracker-wizard"
 
-export default async function ImportTrackerPage() {
+export default async function ImportCardsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>
+}) {
   const session = await auth()
   if (!session?.user?.id) {
     redirect("/signin?callbackUrl=/cards/import")
@@ -17,6 +26,8 @@ export default async function ImportTrackerPage() {
   if (!hasPermission(session.user.role, "financial:write")) {
     redirect("/overview")
   }
+  const { source } = await searchParams
+  const defaultTab = source === "monarch" ? "monarch" : "tracker"
 
   return (
     <div className="space-y-6">
@@ -26,11 +37,22 @@ export default async function ImportTrackerPage() {
         </p>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Import your tracker</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Bring your whole portfolio over from the spreadsheet in one pass — review first, then
-          confirm.
+          Bring your whole portfolio over from the spreadsheet, or refresh balances from a Monarch
+          export — review first, then confirm.
         </p>
       </div>
-      <ImportTrackerWizard />
+      <Tabs defaultValue={defaultTab}>
+        <TabsList>
+          <TabsTrigger value="tracker">Tracker workbook</TabsTrigger>
+          <TabsTrigger value="monarch">Monarch balances</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tracker" className="mt-4">
+          <ImportTrackerWizard />
+        </TabsContent>
+        <TabsContent value="monarch" className="mt-4">
+          <ImportMonarchWizard />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
