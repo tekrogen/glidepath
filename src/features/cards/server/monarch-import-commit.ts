@@ -93,14 +93,13 @@ export async function commitMonarchImport(
         }
       }
 
-      // 4. Clear stale holders of keys being (re)claimed by OTHER cards, so
-      //    rebinding a remembered account never trips the unique constraint.
+      // 4. Clear EVERY current holder of a key in the update set — including
+      //    cards that are themselves being updated (review finding: excluding
+      //    them made a rebind/key-swap between two updated cards abort on the
+      //    unique constraint). Each update rewrites its own key in step 5, so
+      //    clearing first is always safe inside this transaction.
       await tx.creditCard.updateMany({
-        where: {
-          householdId,
-          monarchAccountKey: { in: accountKeys },
-          id: { notIn: cardIds },
-        },
+        where: { householdId, monarchAccountKey: { in: accountKeys } },
         data: { monarchAccountKey: null },
       })
 

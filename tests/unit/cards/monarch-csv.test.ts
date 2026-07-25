@@ -29,12 +29,13 @@ describe("parseSignedDollarsToMinor", () => {
 })
 
 describe("parseCsv", () => {
-  it("quoted commas, doubled-quote escapes, embedded newlines, CRLF+LF", () => {
+  it("quoted commas, doubled-quote escapes, embedded newlines, CRLF+LF — with physical line numbers", () => {
     const records = parseCsv('a,b,c\r\n"x, y","he said ""hi""","line1\nline2"\nlast,row,here\n')
     expect(records).toEqual([
-      ["a", "b", "c"],
-      ["x, y", 'he said "hi"', "line1\nline2"],
-      ["last", "row", "here"],
+      { fields: ["a", "b", "c"], line: 1 },
+      { fields: ["x, y", 'he said "hi"', "line1\nline2"], line: 2 },
+      // The quoted field consumed a physical newline — "last" starts on 4.
+      { fields: ["last", "row", "here"], line: 4 },
     ])
   })
 })
@@ -83,6 +84,24 @@ describe("parseMonarchBalancesCsv", () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].account).toBe("Good (...4444)")
     expect(warnings).toHaveLength(3)
+  })
+
+  it("warnings name PHYSICAL lines — blank lines don't shift them", () => {
+    const { rows, warnings } = parseMonarchBalancesCsv(
+      "Date,Balance,Account\n\n\n2026-07-17,junk,Bad (...1111)\n2026-07-17,-5.00,Good (...2222)"
+    )
+    expect(rows).toHaveLength(1)
+    expect(warnings[0]).toContain("Line 4") // physical line, not record index
+  })
+
+  it("refuses pathologically long account names (the persisted-key/index bound)", () => {
+    const long = "X".repeat(600) + " (...1234)"
+    const { rows, warnings } = parseMonarchBalancesCsv(
+      `Date,Balance,Account\n2026-07-17,-5.00,${long}\n2026-07-17,-6.00,Ok (...5678)`
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].account).toBe("Ok (...5678)")
+    expect(warnings[0]).toContain("longer than")
   })
 
   it("caps warnings at 20 with an '…and N more' tail", () => {

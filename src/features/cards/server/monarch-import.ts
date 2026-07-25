@@ -49,8 +49,9 @@ function displayNameOf(account: string): string {
 
 /**
  * Collapse the daily grid to one snapshot per verbatim account: newest
- * date wins; a duplicate (account, date) pair keeps the LATER physical row
- * and warns. asOfDate = the file-wide max date.
+ * date wins; on duplicate rows for the USED (newest) date the later
+ * physical row wins with a warning — superseded duplicates can't affect
+ * the figure and stay silent. asOfDate = the file-wide max date.
  */
 export function aggregateSnapshots(rows: MonarchBalanceRow[]): {
   snapshots: MonarchAccountSnapshot[]
@@ -59,7 +60,10 @@ export function aggregateSnapshots(rows: MonarchBalanceRow[]): {
   interface Acc {
     latest: MonarchBalanceRow
     everNegative: boolean
-    dupDates: boolean
+    /** Rows seen per date — duplicate detection must not depend on file
+     *  order (review finding: comparing only against the running latest
+     *  missed superseded duplicates and misattributed the warning). */
+    dateCounts: Map<string, number>
   }
   const byAccount = new Map<string, Acc>()
   for (const row of rows) {
@@ -68,17 +72,14 @@ export function aggregateSnapshots(rows: MonarchBalanceRow[]): {
       byAccount.set(row.account, {
         latest: row,
         everNegative: row.balanceMinor < 0n,
-        dupDates: false,
+        dateCounts: new Map([[row.date, 1]]),
       })
       continue
     }
     acc.everNegative = acc.everNegative || row.balanceMinor < 0n
-    if (row.date > acc.latest.date) acc.latest = row
-    else if (row.date === acc.latest.date) {
-      // Later physical row wins on an exact duplicate date.
-      acc.latest = row
-      acc.dupDates = true
-    }
+    acc.dateCounts.set(row.date, (acc.dateCounts.get(row.date) ?? 0) + 1)
+    // Newest date wins; the LATER physical row wins an exact tie.
+    if (row.date >= acc.latest.date) acc.latest = row
   }
   let asOfDate: string | null = null
   for (const { latest } of byAccount.values()) {
@@ -88,8 +89,12 @@ export function aggregateSnapshots(rows: MonarchBalanceRow[]): {
     .map(([accountKey, acc]) => {
       const suffixInfo = extractSuffix(accountKey)
       const warnings: string[] = []
-      if (acc.dupDates) {
-        warnings.push("Duplicate rows for the same date — the file's later row was used.")
+      // Only duplicates of the date actually USED can affect the imported
+      // figure — that is the one worth warning about.
+      if ((acc.dateCounts.get(acc.latest.date) ?? 0) > 1) {
+        warnings.push(
+          `Duplicate rows for ${acc.latest.date} — the file's later row was used.`
+        )
       }
       const stale = asOfDate != null && acc.latest.date < asOfDate
       if (stale) {
@@ -223,10 +228,11 @@ export function matchSnapshots(
 
   const entries = snapshots.map((snapshot): MonarchMatchEntry => {
     const { owedMinor, creditBalance } = toOwedMinor(snapshot.latestBalanceMinor)
+    // NOTE: no warning text is pushed for creditBalance here — a positive
+    // balance is normal for the file's bank/brokerage rows and "stored as
+    // $0" is only true when a write target exists (review finding). The
+    // flag rides on the entry; the wizard warns only on rows with a target.
     const warnings = [...snapshot.warnings]
-    if (creditBalance) {
-      warnings.push("Monarch shows a credit balance — stored as $0 owed.")
-    }
 
     // Tier 1 — remembered.
     const remembered = byKey.get(snapshot.accountKey)
@@ -324,10 +330,15 @@ export function matchSnapshots(
     }
   })
 
-  const cardsNotInFile = cards.filter((c) => {
-    const target = entries.find((e) => e.cardId === c.id)
-    return target == null
-  })
+  // "Not in this export" must exclude every card the FILE references —
+  // targeted (cardId) or merely mentioned (a remembered link demoted for
+  // currency still ties the card to a file row; review finding — the
+  // `mentioned` set exists for exactly this and was previously unused).
+  const referenced = new Set<string>(mentioned)
+  for (const e of entries) {
+    if (e.cardId != null) referenced.add(e.cardId)
+  }
+  const cardsNotInFile = cards.filter((c) => !referenced.has(c.id))
 
   return { entries, asOfDate: snapshots[0] ? maxDate(snapshots) : null, cardsNotInFile }
 }

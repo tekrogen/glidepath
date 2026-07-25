@@ -31,7 +31,7 @@ import {
 import { formatMinor, formatShortDate } from "@/lib/formatting"
 
 // Mirrors the server action's cap — see the constant-pair comment there.
-const MAX_UPLOAD_BYTES = 1024 * 1024
+const MAX_UPLOAD_BYTES = 950 * 1024
 
 const utcDay = (iso: string) => new Date(`${iso}T00:00:00Z`)
 
@@ -150,6 +150,9 @@ function WizardRun({ onRestart }: { onRestart: () => void }) {
                 type="file"
                 accept=".csv,text/csv"
                 aria-describedby="monarch-file-hint"
+                // Locked while parsing — the previewed bytes must be the
+                // bytes a later confirm re-sends (review finding).
+                disabled={pending}
                 onChange={(e) => {
                   setClientError(null)
                   setFile(e.target.files?.[0] ?? null)
@@ -273,11 +276,12 @@ function PreviewStep({
         </ul>
 
         {skippedRows.length > 0 && (
-          <details className="rounded-md border border-border px-3 py-2">
-            <summary className="cursor-pointer text-sm text-muted-foreground">
+          <details className="rounded-md border border-border">
+            {/* Padding on the SUMMARY: ≥36px target per the #45 ≥24px bar (DS-48-005). */}
+            <summary className="cursor-pointer px-3 py-2 text-sm text-muted-foreground">
               Other accounts skipped ({skippedRows.length}) — bank balances aren&apos;t imported
             </summary>
-            <ul className="mt-2 space-y-2">
+            <ul className="space-y-2 px-3 pb-2">
               {skippedRows.map((entry) => (
                 <MatchRow
                   key={entry.accountKey}
@@ -295,11 +299,11 @@ function PreviewStep({
         )}
 
         {state.cardsNotInFile.length > 0 && (
-          <details className="rounded-md border border-border px-3 py-2">
-            <summary className="cursor-pointer text-sm text-muted-foreground">
+          <details className="rounded-md border border-border">
+            <summary className="cursor-pointer px-3 py-2 text-sm text-muted-foreground">
               Not in this export ({state.cardsNotInFile.length})
             </summary>
-            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <ul className="space-y-1 px-3 pb-2 text-xs text-muted-foreground">
               {state.cardsNotInFile.map((c) => (
                 <li key={c.id}>
                   {c.cardName} · {c.issuer}
@@ -317,13 +321,14 @@ function PreviewStep({
           </p>
           <div className="flex items-center gap-3">
             {unresolvedCount > 0 && (
-              <p className="text-xs text-error-text" role="status">
+              <p id="monarch-unresolved-note" className="text-xs text-error-text" role="status">
                 {unresolvedCount} account{unresolvedCount === 1 ? " needs" : "s need"} a choice
               </p>
             )}
             <Button
               onClick={onConfirm}
               disabled={pending || unresolvedCount > 0 || importCount === 0}
+              aria-describedby={unresolvedCount > 0 ? "monarch-unresolved-note" : undefined}
               data-testid="monarch-confirm"
             >
               {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -359,10 +364,19 @@ function MatchRow({
     .filter((c): c is MonarchPickerCard => c != null)
   const rest = pickerCards.filter((c) => !entry.rankedCandidateIds.includes(c.id))
   const needsChoice = entry.status === "ambiguous" && !resolved
+  // DS-48-001: an unresolved AMBIGUOUS row must show a true PLACEHOLDER —
+  // displaying "Don't import" reads as a chosen skip, and worse, selecting
+  // it re-selects the current value so no change event ever records the
+  // skip. The explicit skip is therefore its own option value.
+  const selectValue = needsChoice ? "" : resolved && target == null ? "__skip" : (target ?? "")
 
   return (
     <li
-      className={`rounded-md border px-3 py-2 ${needsChoice ? "border-warning" : "border-border"}`}
+      className={`rounded-md border px-3 py-2 ${
+        // bg tint so the urgency cue survives light mode (DS-48-003: the
+        // 1px warning border alone computes 1.98:1 — invisible).
+        needsChoice ? "border-warning bg-warning/10" : "border-border"
+      }`}
       data-testid="monarch-row"
       data-status={entry.status}
     >
@@ -373,7 +387,16 @@ function MatchRow({
             as of {formatShortDate(utcDay(entry.asOf))}
           </p>
         </div>
-        <Badge variant={entry.status === "remembered" || entry.status === "suggested" ? "secondary" : "outline"}>
+        {/* Chip contract (DS-48-002): text stays foreground on a tint —
+            the secondary FILL under 12px white text is 2.39:1 in light. */}
+        <Badge
+          variant="outline"
+          className={
+            entry.status === "remembered" || entry.status === "suggested"
+              ? "border-secondary/50 bg-secondary/15 text-foreground"
+              : ""
+          }
+        >
           {resolved && entry.status !== "remembered" && entry.status !== "suggested"
             ? target
               ? "Linked"
@@ -384,13 +407,29 @@ function MatchRow({
 
       <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
         <select
-          value={target ?? ""}
-          onChange={(e) => onResolve(entry.accountKey, e.target.value === "" ? null : e.target.value)}
+          value={selectValue}
+          onChange={(e) =>
+            onResolve(
+              entry.accountKey,
+              e.target.value === "__skip" || e.target.value === "" ? null : e.target.value
+            )
+          }
           aria-label={`Card for ${entry.accountKey}`}
           data-testid="monarch-picker"
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
         >
-          <option value="">Don&apos;t import</option>
+          {needsChoice ? (
+            <>
+              <option value="" disabled hidden>
+                Choose a card — or skip
+              </option>
+              <option value="__skip">Don&apos;t import this account</option>
+            </>
+          ) : entry.status === "ambiguous" ? (
+            <option value="__skip">Don&apos;t import this account</option>
+          ) : (
+            <option value="">Don&apos;t import</option>
+          )}
           {[...ranked, ...rest].map((c) => {
             const heldBy = takenBy.get(c.id)
             const disabled = heldBy != null && heldBy !== entry.accountKey
@@ -418,7 +457,7 @@ function MatchRow({
         </p>
       </div>
 
-      {entry.warnings.length > 0 && (
+      {(entry.warnings.length > 0 || (entry.creditBalanceClamped && target != null)) && (
         <ul className="mt-2 space-y-1">
           {entry.warnings.map((w, i) => (
             <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -426,6 +465,14 @@ function MatchRow({
               {w}
             </li>
           ))}
+          {/* Only rows that will WRITE warn about the clamp — a positive
+              balance on a skipped bank row is normal (review finding). */}
+          {entry.creditBalanceClamped && target != null && (
+            <li className="flex items-start gap-1.5 text-xs text-muted-foreground">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warning" aria-hidden />
+              Monarch shows a credit balance — it will be stored as $0 owed.
+            </li>
+          )}
         </ul>
       )}
     </li>
@@ -465,7 +512,10 @@ function ReportStep({
               </span>
               <span className="flex items-center gap-2 tabular-nums">
                 {formatMinor(c.beforeCents)} → {formatMinor(c.afterCents)}
-                <Badge variant={c.outcome === "changed" ? "default" : "secondary"}>
+                <Badge
+                  variant={c.outcome === "changed" ? "default" : "outline"}
+                  className={c.outcome === "changed" ? "" : "bg-secondary/15 text-foreground"}
+                >
                   {c.outcome === "changed" ? "Changed" : "Unchanged"}
                 </Badge>
               </span>

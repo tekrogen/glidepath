@@ -35,7 +35,8 @@ export default async function ImportCardsPage({
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
           Cards · Onboarding
         </p>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">Import your tracker</h1>
+        {/* Source-neutral since #48 — the page hosts two import flows. */}
+        <h1 className="font-heading text-3xl font-bold tracking-tight">Import cards</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Bring your whole portfolio over from the spreadsheet, or refresh balances from a Monarch
           export — review first, then confirm.

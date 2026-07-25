@@ -47,19 +47,42 @@ const snap = (over: Partial<MonarchAccountSnapshot> & { accountKey: string }): M
 })
 
 describe("aggregateSnapshots", () => {
-  it("newest per account; duplicate date → later physical row + warning; stale flag", () => {
+  it("newest per account; duplicate of the USED date → later physical row + warning; stale flag", () => {
     const { snapshots, asOfDate } = aggregateSnapshots([
       row("2026-07-16", -100n, "A (...1111)"),
       row("2026-07-17", -200n, "A (...1111)"),
-      row("2026-07-17", -300n, "A (...1111)"), // dup date — later row wins
+      row("2026-07-17", -300n, "A (...1111)"), // dup of the used date — later row wins
       row("2026-07-10", -50n, "Old (...2222)"), // ends early — stale
     ])
     expect(asOfDate).toBe("2026-07-17")
     const a = snapshots.find((s) => s.accountKey === "A (...1111)")!
     expect(a.latestBalanceMinor).toBe(-300n)
-    expect(a.warnings.some((w) => w.includes("Duplicate rows"))).toBe(true)
+    expect(a.warnings.some((w) => w.includes("Duplicate rows for 2026-07-17"))).toBe(true)
     const old = snapshots.find((s) => s.accountKey === "Old (...2222)")!
     expect(old.stale).toBe(true)
+  })
+
+  it("duplicate detection is ORDER-INDEPENDENT (review finding): newest-first files still warn", () => {
+    // Newest-first order — the old running-latest comparison missed this.
+    const { snapshots } = aggregateSnapshots([
+      row("2026-07-17", -100n, "A (...1111)"),
+      row("2026-07-17", -150n, "A (...1111)"), // dup of the used date, later row wins
+      row("2026-07-16", -200n, "A (...1111)"),
+    ])
+    const a = snapshots[0]
+    expect(a.latestBalanceMinor).toBe(-150n)
+    expect(a.warnings.some((w) => w.includes("Duplicate rows for 2026-07-17"))).toBe(true)
+  })
+
+  it("superseded duplicates (not the used date) stay silent — they can't affect the figure", () => {
+    const { snapshots } = aggregateSnapshots([
+      row("2026-07-16", -200n, "A (...1111)"),
+      row("2026-07-16", -300n, "A (...1111)"), // dup, but superseded by 07-17
+      row("2026-07-17", -100n, "A (...1111)"),
+    ])
+    const a = snapshots[0]
+    expect(a.latestBalanceMinor).toBe(-100n)
+    expect(a.warnings).toEqual([])
   })
 })
 
@@ -132,16 +155,37 @@ describe("matchSnapshots — tier order", () => {
     expect(plan.entries[0].rankedCandidateIds).toContain("c1") // still pickable
   })
 
-  it("BALANCE-EQUALITY TRAP: a wrong card whose balance equals the CSV value is never chosen", () => {
-    // CSV says -3166.28 for suffix 7727; the WRONG card (different suffix)
-    // carries exactly 316628n. Balance equality must appear nowhere.
+  it("BALANCE-EQUALITY TRAP: an exact balance match can neither select nor break a tie", () => {
+    // Strengthened per review finding — the trap must sit where balance
+    // equality WOULD decide if it were consulted at all:
+    // (a) tie-break: two candidates share the suffix; one's balance equals
+    //     the CSV value exactly. If equality were a signal, that card would
+    //     be preselected — it must stay ambiguous with NO preselection.
+    const equal = card({ id: "equal", cardName: "Equal", lastFour: "7727", currentBalanceMinor: 316628n })
+    const other = card({ id: "other", cardName: "Other", lastFour: "7727", currentBalanceMinor: 1n })
+    const tie = matchSnapshots(
+      [snap({ accountKey: "My Best Buy® Visa® Card (...7727)", suffix: "7727", suffixKind: "four", latestBalanceMinor: -316628n })],
+      [equal, other]
+    )
+    expect(tie.entries[0].status).toBe("ambiguous")
+    expect(tie.entries[0].cardId).toBeNull()
+    // (b) selection: a suffix-contradicted card with the equal balance must
+    //     stay excluded — equality never resurrects a candidate.
     const trap = card({ id: "trap", cardName: "Wrong Card", lastFour: "9034", currentBalanceMinor: 316628n })
-    const plan = matchSnapshots(
+    const excl = matchSnapshots(
       [snap({ accountKey: "My Best Buy® Visa® Card (...7727)", suffix: "7727", suffixKind: "four", latestBalanceMinor: -316628n })],
       [trap]
     )
-    expect(plan.entries[0].status).toBe("unmatched") // trap excluded by contradiction; no signal used
-    expect(plan.entries[0].cardId).toBeNull()
+    expect(excl.entries[0].status).toBe("unmatched")
+    expect(excl.entries[0].cardId).toBeNull()
+    expect(excl.entries[0].rankedCandidateIds).toEqual([])
+  })
+
+  it("a remembered non-USD card is file-referenced — never listed as 'Not in this export'", () => {
+    const linkedEur = card({ id: "c1", currency: "EUR", monarchAccountKey: "Fern (...8391)" })
+    const plan = matchSnapshots([snap({ accountKey: "Fern (...8391)" })], [linkedEur])
+    expect(plan.entries[0].status).toBe("unmatched") // demoted for currency
+    expect(plan.cardsNotInFile).toEqual([]) // but referenced by the file (review finding)
   })
 
   it("non-USD cards are excluded from suggestion; a remembered non-USD link demotes with a warning", () => {

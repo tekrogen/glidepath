@@ -34,6 +34,16 @@ export interface MonarchBalanceRow {
 }
 
 const WARNING_CAP = 20
+/** Longest acceptable verbatim account string (the persisted match key). */
+export const MAX_ACCOUNT_CHARS = 512
+
+export interface CsvRecord {
+  fields: string[]
+  /** 1-based PHYSICAL line the record starts on — warnings must name the
+   *  line a user can find in their file (review finding: a filtered-record
+   *  index drifts past blank lines and quoted embedded newlines). */
+  line: number
+}
 
 /**
  * RFC 4180-lite tokenizer: quoted fields may contain commas, doubled-quote
@@ -41,13 +51,15 @@ const WARNING_CAP = 20
  * is stripped. The raw shape is shared so a future transactions parser
  * (the stretch goal) sits beside the balances one.
  */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string): CsvRecord[] {
   const src = text.replace(/^﻿/, "")
-  const records: string[][] = []
+  const records: CsvRecord[] = []
   let fields: string[] = []
   let cur = ""
   let inQuotes = false
   let started = false
+  let line = 1
+  let recordLine = 1
   const endField = () => {
     fields.push(cur)
     cur = ""
@@ -55,8 +67,9 @@ export function parseCsv(text: string): string[][] {
   }
   const endRecord = () => {
     endField()
-    records.push(fields)
+    records.push({ fields, line: recordLine })
     fields = []
+    recordLine = line
   }
   for (let i = 0; i < src.length; i++) {
     const ch = src[i]
@@ -69,6 +82,7 @@ export function parseCsv(text: string): string[][] {
           inQuotes = false
         }
       } else {
+        if (ch === "\n") line++
         cur += ch
       }
     } else if (ch === '"' && !started && cur === "") {
@@ -77,9 +91,11 @@ export function parseCsv(text: string): string[][] {
     } else if (ch === ",") {
       endField()
     } else if (ch === "\n") {
+      line++
       endRecord()
     } else if (ch === "\r") {
       if (src[i + 1] === "\n") i++
+      line++
       endRecord()
     } else {
       cur += ch
@@ -89,7 +105,7 @@ export function parseCsv(text: string): string[][] {
   // Final record unless the file ended exactly on a record boundary.
   if (cur !== "" || fields.length > 0) endRecord()
   // A trailing newline produces one empty single-field record — drop those.
-  return records.filter((r) => !(r.length === 1 && r[0].trim() === ""))
+  return records.filter((r) => !(r.fields.length === 1 && r.fields[0].trim() === ""))
 }
 
 /** yyyy-mm-dd, round-trip validated (2026-02-31 is rejected, never rolled). */
@@ -109,7 +125,7 @@ export function parseMonarchBalancesCsv(text: string): {
   if (records.length === 0) throw new MonarchCsvFormatError()
 
   // Header located by name — case-insensitive, order-independent.
-  const header = records[0].map((h) => h.trim().toLowerCase())
+  const header = records[0].fields.map((h) => h.trim().toLowerCase())
   const dateCol = header.indexOf("date")
   const balanceCol = header.indexOf("balance")
   const accountCol = header.indexOf("account")
@@ -126,21 +142,29 @@ export function parseMonarchBalancesCsv(text: string): {
   }
 
   for (let i = 1; i < records.length; i++) {
-    const record = records[i]
-    if (record.length !== 3) {
-      warn(`Line ${i + 1}: expected 3 fields, got ${record.length} — skipped.`)
+    const { fields, line } = records[i]
+    if (fields.length !== 3) {
+      warn(`Line ${line}: expected 3 fields, got ${fields.length} — skipped.`)
       continue
     }
-    const date = validDate(record[dateCol])
-    const balanceMinor = parseSignedDollarsToMinor(record[balanceCol])
-    const account = record[accountCol].trim()
+    const date = validDate(fields[dateCol])
+    const balanceMinor = parseSignedDollarsToMinor(fields[balanceCol])
+    const account = fields[accountCol].trim()
     if (!date || balanceMinor == null || account === "") {
-      warn(`Line ${i + 1}: unreadable date, balance, or account — skipped.`)
+      warn(`Line ${line}: unreadable date, balance, or account — skipped.`)
+      continue
+    }
+    // The account string becomes the persisted match key — a pathological
+    // length would exceed the Postgres btree index row limit at COMMIT
+    // (aborting the whole import with a generic error); refuse it at parse
+    // with a findable message instead (review finding). Real names ≤ 60.
+    if (account.length > MAX_ACCOUNT_CHARS) {
+      warn(`Line ${line}: account name longer than ${MAX_ACCOUNT_CHARS} characters — skipped.`)
       continue
     }
     const magnitude = balanceMinor < 0n ? -balanceMinor : balanceMinor
     if (magnitude > MAX_AMOUNT_MINOR) {
-      warn(`Line ${i + 1}: balance exceeds the app's maximum — skipped.`)
+      warn(`Line ${line}: balance exceeds the app's maximum — skipped.`)
       continue
     }
     rows.push({ date, balanceMinor, account })

@@ -31,22 +31,24 @@ import {
   type MonarchMatchPlan,
 } from "@/features/cards/server/monarch-import"
 import {
+  findHouseholdIdForUser,
+  findMatchableCards,
+} from "@/features/cards/server/repository"
+import {
   commitMonarchImport,
   type MonarchImportCardOutcome,
   type ResolvedMonarchUpdate,
 } from "@/features/cards/server/monarch-import-commit"
 
-/** Serialized entry — cents as number, bigint never crosses RSC. */
+/** Serialized entry — cents as number, bigint never crosses RSC. Only
+ *  fields the wizard actually renders (review finding: no dead payload). */
 export interface MonarchPreviewEntry {
   accountKey: string
-  displayName: string
-  suffix: string | null
   status: MatchStatus
   cardId: string | null
   rankedCandidateIds: string[]
   owedCents: number
   asOf: string
-  stale: boolean
   creditBalanceClamped: boolean
   warnings: string[]
 }
@@ -88,10 +90,12 @@ export type ConfirmMonarchState =
       cards: MonarchImportCardOutcome[]
     }
 
-// Real fixture ≈ 280 KB (7 months × 31 accounts) — 1 MB gives ~2 years of
-// headroom before "export a shorter date range" friction. Mirrored
-// client-side for a friendly message (the tracker constant-pair idiom).
-const MAX_UPLOAD_BYTES = 1024 * 1024
+// Real fixture ≈ 280 KB (7 months × 31 accounts) — ~2 years of headroom
+// before "export a shorter date range" friction. Deliberately UNDER Next's
+// 1 MB server-action body limit so this friendly check can actually run
+// server-side instead of the transport 413ing first (review finding).
+// Mirrored client-side (the tracker constant-pair idiom).
+const MAX_UPLOAD_BYTES = 950 * 1024
 
 /** Rows the user touched or that needed a choice: cardId null = explicit skip. */
 const resolutionsSchema = z.array(
@@ -129,27 +133,12 @@ async function readUpload(
   return { ok: true, fileName: file.name, rows: parsed.rows, warnings: parsed.warnings }
 }
 
-/** The household's cards in matcher shape; null when the user has no household. */
-async function findMatchableCards(userId: string): Promise<MatchableCard[] | null> {
-  const member = await prisma.householdMember.findFirst({
-    where: { userId },
-    select: { householdId: true },
-  })
-  if (!member) return null
-  const cards = await prisma.creditCard.findMany({
-    where: { householdId: member.householdId },
-    select: {
-      id: true,
-      cardName: true,
-      issuer: true,
-      lastFour: true,
-      currency: true,
-      monarchAccountKey: true,
-      currentBalanceMinor: true,
-    },
-    orderBy: [{ cardName: "asc" }],
-  })
-  return cards
+/** The household's cards in matcher shape; null when the user has no
+ *  household. Prisma stays behind the repository (arch §15). */
+async function cardsForUser(userId: string): Promise<MatchableCard[] | null> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) return null
+  return findMatchableCards(householdId)
 }
 
 function buildPlan(rows: MonarchBalanceRow[], cards: MatchableCard[]): MonarchMatchPlan {
@@ -177,7 +166,7 @@ export async function previewMonarchImport(
   const read = await readUpload(formData)
   if (!read.ok) return { status: "error", message: read.message }
 
-  const cards = await findMatchableCards(session.user.id)
+  const cards = await cardsForUser(session.user.id)
   if (!cards || cards.length === 0) {
     return {
       status: "error",
@@ -188,14 +177,11 @@ export async function previewMonarchImport(
   const plan = buildPlan(read.rows, cards)
   const entries: MonarchPreviewEntry[] = plan.entries.map((e) => ({
     accountKey: e.snapshot.accountKey,
-    displayName: e.snapshot.displayName,
-    suffix: e.snapshot.suffix,
     status: e.status,
     cardId: e.cardId,
     rankedCandidateIds: e.rankedCandidateIds,
     owedCents: Number(e.owedMinor),
     asOf: e.snapshot.latestDate,
-    stale: e.snapshot.stale,
     creditBalanceClamped: e.creditBalanceClamped,
     warnings: e.warnings,
   }))
@@ -238,7 +224,7 @@ export async function confirmMonarchImport(
     return { status: "error", message: "The match choices couldn't be read — nothing was changed." }
   }
 
-  const cards = await findMatchableCards(session.user.id)
+  const cards = await cardsForUser(session.user.id)
   if (!cards || cards.length === 0) {
     return { status: "error", message: "Import your cards first — this file only carries balances." }
   }

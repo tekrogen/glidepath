@@ -155,6 +155,13 @@ test("preview: statuses, tripwire ambiguity with NO preselection, deltas, bucket
   await expect(page.getByText(/Other accounts skipped \(1\)/)).toBeVisible()
   const orphanRow = page.getByTestId("monarch-row").filter({ hasText: "Orphan" })
   await expect(orphanRow).toHaveAttribute("data-status", "unmatched")
+
+  // EXPLICIT SKIP is reachable in one action (DS-48-001: the placeholder
+  // and the skip are distinct options — selecting skip must fire and
+  // unblock confirm without ever picking a card).
+  await storeRow.getByTestId("monarch-picker").selectOption("__skip")
+  await expect(storeRow.getByText("Skipped")).toBeVisible()
+  await expect(page.getByTestId("monarch-confirm")).toBeEnabled()
 })
 
 test("resolve, confirm, verify to the cent; then re-run is a remembered no-op", async ({
@@ -198,6 +205,34 @@ test("resolve, confirm, verify to the cent; then re-run is a remembered no-op", 
   await page.getByTestId("monarch-confirm").click()
   await expect(page.getByRole("heading", { name: "Import complete" })).toBeVisible()
   await expect(page.getByText(/0 balance changes/)).toBeVisible()
+})
+
+test("re-linking a remembered account to a different card succeeds (stale-key clearing)", async ({
+  page,
+}) => {
+  // Store Card is remembered on Beta from the previous test. Re-link it to
+  // Gamma — pre-fix, the unique-constraint clearing excluded update-set
+  // cards and this aborted the whole import (review finding, high).
+  await uploadAndPreview(page, csvPath)
+  const storeRow = page.getByTestId("monarch-row").filter({ hasText: "Store Card" })
+  await expect(storeRow).toHaveAttribute("data-status", "remembered")
+  const picker = storeRow.getByTestId("monarch-picker")
+  const gammaValue = await picker
+    .locator("option", { hasText: "E2EMON Gamma" })
+    .getAttribute("value")
+  await picker.selectOption(gammaValue!)
+  await page.getByTestId("monarch-confirm").click()
+
+  await expect(page.getByRole("heading", { name: "Import complete" })).toBeVisible()
+  const report = page.getByTestId("monarch-report")
+  await expect(report).toContainText("E2EMON Gamma")
+  await expect(report).toContainText("$300.00 → $55.00")
+
+  // Gamma took the balance + key; Beta keeps its last value, now unlinked.
+  const gamma = await findCardRow(page, "E2EMON Gamma")
+  await expect(gamma).toContainText("$55.00")
+  const beta = await findCardRow(page, "E2EMON Beta")
+  await expect(beta).toContainText("$55.00")
 })
 
 test("error paths: wrong header, garbage bytes, oversize", async ({ page }) => {

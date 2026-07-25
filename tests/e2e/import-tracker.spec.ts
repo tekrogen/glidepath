@@ -92,7 +92,7 @@ test.afterAll(() => {
 
 async function uploadAndPreview(page: Page, file: string) {
   await page.goto("/cards/import")
-  await expect(page.getByRole("heading", { name: "Import your tracker" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Import cards" })).toBeVisible()
   // Scoped inside the tabpanel (issue #48 added source tabs — the panel
   // itself is aria-labelled "Tracker workbook" by its trigger).
   await page.getByRole("tabpanel").getByLabel("Tracker workbook").setInputFiles(file)
@@ -103,7 +103,7 @@ test("Settings links to the import screen", async ({ page }) => {
   await page.goto("/settings")
   await page.getByRole("link", { name: "Import Cards" }).click()
   await expect(page).toHaveURL(/\/cards\/import/)
-  await expect(page.getByRole("heading", { name: "Import your tracker" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Import cards" })).toBeVisible()
 })
 
 test("preview surfaces every mapped field and warning before any write", async ({ page }) => {
