@@ -25,6 +25,28 @@ export type DomainEvent =
       cardName: string
     }
   | {
+      type: "CardUpdated"
+      userId: string
+      householdId: string
+      cardId: string
+      cardName: string
+      /** Form-field names whose values changed — the audit's what, not the values. */
+      changedFields: string[]
+    }
+  | {
+      type: "CardDeleted"
+      userId: string
+      householdId: string
+      cardId: string
+      cardName: string
+      /** Restrict-FK rows removed with the card (issue #47/#57 — explicit
+       *  audited removal, a recorded deviation from the blueprint's
+       *  archive-first CardArchived model, per Marti 2026-07-25). */
+      removedScheduledPayments: number
+      removedStatements: number
+      removedAutopayLink: boolean
+    }
+  | {
       type: "TrackerImported"
       userId: string
       householdId: string

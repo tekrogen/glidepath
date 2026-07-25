@@ -19,7 +19,7 @@ import { z } from "zod"
 import { auth } from "@/lib/auth"
 import { hasPermission } from "@/lib/auth/constants"
 import { createCardSchema } from "@/features/cards/schemas/create-card-schema"
-import { createCardForUser } from "@/features/cards/server/service"
+import { createCardForUser, ForeignOwnerError } from "@/features/cards/server/service"
 
 export type CreateCardState = {
   success: boolean
@@ -62,6 +62,14 @@ export async function createCard(
   try {
     ;({ cardId } = await createCardForUser(session.user.id, parsed.data))
   } catch (error) {
+    if (error instanceof ForeignOwnerError) {
+      return {
+        success: false,
+        message: "Check the highlighted fields.",
+        fieldErrors: { ownerMemberId: [error.message] },
+        values: rawValues(formData),
+      }
+    }
     console.error("createCard failed:", error)
     return {
       success: false,

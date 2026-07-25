@@ -25,6 +25,7 @@ const base: CreateCardInput = {
   minimumPaymentMinor: 6800n,
   paymentNote: "$350/month",
   notes: "note",
+  ownerMemberId: null,
 }
 
 describe("toCreateCardData", () => {
@@ -97,6 +98,7 @@ describe("toCreateCardData", () => {
       minimumPaymentMinor: null,
       paymentNote: null,
       notes: null,
+      ownerMemberId: null,
     })
     expect(data.currentBalanceMinor).toBe(0n)
     expect(data.creditLimitMinor).toBeNull()

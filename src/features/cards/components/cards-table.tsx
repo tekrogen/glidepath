@@ -7,11 +7,14 @@
  * (never re-derived here — EDR-003).
  */
 import { useMemo, useState } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { resolveStatusBadge, type Alert, type Lifecycle } from "@/features/cards"
+import type { HouseholdMemberOption } from "@/features/cards/components/card-form-fields"
+import type { EditCardSeed } from "@/features/cards/components/edit-card-form"
+import { EditCardSheet } from "@/features/cards/components/edit-card-sheet"
 import { FreezeControl } from "@/features/cards/components/freeze-control"
 import { StatusBadge } from "@/features/cards/components/status-badge"
 import { formatMinor, formatPercent } from "@/lib/formatting"
@@ -40,6 +43,8 @@ export interface CardsTableRow {
   dueDay: number | null
   minPayCents: number | null
   hasEstimatedInputs: boolean
+  /** Everything the edit sheet needs, preserialized at the RSC boundary (issue #47). */
+  edit: EditCardSeed
 }
 
 type SortKey =
@@ -99,10 +104,18 @@ function SortHeader({
   )
 }
 
-export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
+export function CardsTable({
+  rows,
+  members,
+}: {
+  rows: CardsTableRow[]
+  members: HouseholdMemberOption[]
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("utilization")
   const [sortDesc, setSortDesc] = useState(true)
   const [page, setPage] = useState(0)
+  // The row being edited (issue #47) — one sheet instance for the table.
+  const [editing, setEditing] = useState<EditCardSeed | null>(null)
 
   // Optimistic lifecycle per card id. A fresh `rows` prop means the RSC
   // refetched (router.refresh / navigation) and server truth now reflects
@@ -167,7 +180,10 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
               <th className="px-4 py-3 text-left text-xs font-medium tracking-wide uppercase text-muted-foreground">
                 Status
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium tracking-wide uppercase text-muted-foreground">
+              {/* Sticky (design QA DS-47-002): 10 columns overflow a 1440
+                  content area — row actions must never hide behind an
+                  unindicated horizontal scroll. bg matches the thead band. */}
+              <th className="sticky right-0 bg-muted/40 px-4 py-3 text-right text-xs font-medium tracking-wide uppercase text-muted-foreground backdrop-blur">
                 Actions
               </th>
             </tr>
@@ -250,17 +266,30 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
                   <td className="px-4 py-3">
                     <StatusBadge status={resolveStatusBadge(effectiveLifecycle, r.alert)} />
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <FreezeControl
-                      cardId={r.id}
-                      cardName={r.cardName}
-                      lastFour={r.lastFour}
-                      lifecycle={r.lifecycle}
-                      dueInDays={r.dueInDays}
-                      minPayCents={r.minPayCents}
-                      hasEstimatedInputs={r.hasEstimatedInputs}
-                      onLifecycleChange={(next) => setOverride(r.id, next)}
-                    />
+                  <td className="sticky right-0 bg-card px-4 py-3 text-right">
+                    <span className="inline-flex items-center gap-1">
+                      {/* Per-row edit entry point — the wireframe-2d pencil (issue #47). */}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(r.edit)}
+                        aria-label={`Edit ${r.cardName}`}
+                        title="Edit card"
+                        data-testid="edit-card-trigger"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                      </button>
+                      <FreezeControl
+                        cardId={r.id}
+                        cardName={r.cardName}
+                        lastFour={r.lastFour}
+                        lifecycle={r.lifecycle}
+                        dueInDays={r.dueInDays}
+                        minPayCents={r.minPayCents}
+                        hasEstimatedInputs={r.hasEstimatedInputs}
+                        onLifecycleChange={(next) => setOverride(r.id, next)}
+                      />
+                    </span>
                   </td>
                 </tr>
               )
@@ -297,6 +326,7 @@ export function CardsTable({ rows }: { rows: CardsTableRow[] }) {
           </button>
         </span>
       </div>
+      <EditCardSheet seed={editing} members={members} onClose={() => setEditing(null)} />
     </Card>
   )
 }

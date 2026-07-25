@@ -59,7 +59,12 @@ function dayOfMonthField() {
     })
 }
 
-export const createCardSchema = z
+/**
+ * The shared card form shape — create and edit parse the same fields
+ * through the same rules (issue #47: one parser set, two forms). Edit
+ * extends this with the card id.
+ */
+export const cardFormObject = z
   .object({
     cardName: z
       .string({ error: "Give the card a name." })
@@ -136,19 +141,33 @@ export const createCardSchema = z
       .transform((v) => v.trim())
       .refine((v) => v.length <= 2000, { message: "Notes are limited to 2000 characters." })
       .transform((v) => v || null),
+    /** "" ⇒ shared (no owner); else a household member id — membership is
+     *  verified server-side against the caller's household (EDR-014), the
+     *  #45 lesson: never trust a client-submitted foreign key. */
+    ownerMemberId: z
+      .string()
+      .optional()
+      .default("")
+      .transform((v) => (v.trim() === "" ? null : v.trim())),
   })
-  .superRefine((v, ctx) => {
-    // Past dates are legal data — an already-expired promo is the status
-    // engine's business, not the form's.
-    if (v.hasPromo && v.promoEndsOn == null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["promoEndsOn"],
-        message: "Enter when the 0% promo ends.",
-      })
-    }
-  })
-  .transform((v) => ({
+
+type CardFormValues = z.output<typeof cardFormObject>
+
+/** Past dates are legal data — an already-expired promo is the status
+ *  engine's business, not the form's. */
+export function cardPromoRefine(v: CardFormValues, ctx: z.RefinementCtx) {
+  if (v.hasPromo && v.promoEndsOn == null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["promoEndsOn"],
+      message: "Enter when the 0% promo ends.",
+    })
+  }
+}
+
+/** Form names → domain names (…Minor, …Bps) — shared by create and edit. */
+export function toCardDomain(v: CardFormValues) {
+  return {
     cardName: v.cardName,
     issuer: v.issuer,
     lastFour: v.lastFour,
@@ -162,6 +181,10 @@ export const createCardSchema = z
     minimumPaymentMinor: v.minimumPayment,
     paymentNote: v.paymentNote,
     notes: v.notes,
-  }))
+    ownerMemberId: v.ownerMemberId,
+  }
+}
+
+export const createCardSchema = cardFormObject.superRefine(cardPromoRefine).transform(toCardDomain)
 
 export type CreateCardInput = z.output<typeof createCardSchema>

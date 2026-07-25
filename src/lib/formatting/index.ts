@@ -47,3 +47,8 @@ export function toDollarInput(minor: bigint | number): string {
   const cents = typeof minor === "bigint" ? Number(minor) : minor
   return (cents / 100).toFixed(2)
 }
+
+/** "19.24" from 1924 basis points — seeding a percent text input. */
+export function toPercentInput(bps: number): string {
+  return (bps / 100).toFixed(2)
+}

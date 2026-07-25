@@ -26,16 +26,22 @@ import {
 } from "@/features/cards/utils/card-status"
 import { dueInDays } from "@/features/cards/utils/due-dates"
 import type { CreateCardInput } from "@/features/cards/schemas/create-card-schema"
+import type { EditCardInput } from "@/features/cards/schemas/edit-card-schema"
 import { emitDomainEvent } from "@/server/events/publishers"
 
-import { toCreateCardData } from "./create-card-data"
+import { changedCardFields, toCreateCardData, toUpdateCardData } from "./create-card-data"
 import { toFinanceCard } from "./mappers"
 import {
   createCard,
+  deleteCardWithDependents,
+  findCardDependents,
   findHouseholdCards,
   findHouseholdIdForUser,
+  findHouseholdMembers,
   findOrCreateHouseholdForUser,
   setCardLifecycle,
+  updateCard,
+  verifyHouseholdMember,
   type CardRow,
 } from "./repository"
 
@@ -69,6 +75,16 @@ export interface PortfolioCard {
   finance: FinanceCard
   /** Provenance: true when a displayed derived figure rests on unconfirmed inputs. */
   hasEstimatedInputs: boolean
+  /** Edit-seed fields the finance shape omits (issue #47). */
+  updatedAt: Date
+  statementCloseDay: number | null
+  paymentNote: string | null
+  notes: string | null
+  ownerMemberId: string | null
+  /** Restrict-FK dependents — the delete confirm lists these (issue #57). */
+  scheduledPaymentCount: number
+  statementCount: number
+  hasAutopayLink: boolean
 }
 
 export interface CardPortfolio {
@@ -122,6 +138,14 @@ function toPortfolioCard(
     finance,
     hasEstimatedInputs:
       row.aprSource === "UNKNOWN" || row.limitSource === "UNKNOWN" || row.minimumSource === "UNKNOWN",
+    updatedAt: row.updatedAt,
+    statementCloseDay: row.statementCloseDay,
+    paymentNote: row.paymentNote,
+    notes: row.notes,
+    ownerMemberId: row.ownerMemberId,
+    scheduledPaymentCount: row._count.scheduledPayments,
+    statementCount: row._count.statements,
+    hasAutopayLink: row.autopayLink != null,
   }
 }
 
@@ -138,6 +162,12 @@ export async function createCardForUser(
   input: CreateCardInput
 ): Promise<{ cardId: string }> {
   const householdId = await findOrCreateHouseholdForUser(userId)
+  // Owner FK verified on CREATE exactly as on edit (review finding — the
+  // #45 lesson applies to every path that persists a client-submitted id).
+  if (input.ownerMemberId != null) {
+    const ok = await verifyHouseholdMember(householdId, input.ownerMemberId)
+    if (!ok) throw new ForeignOwnerError("Pick a member of your household.")
+  }
   const card = await createCard(householdId, toCreateCardData(input))
   await emitDomainEvent({
     type: "CardAdded",
@@ -147,6 +177,103 @@ export async function createCardForUser(
     cardName: input.cardName,
   })
   return { cardId: card.id }
+}
+
+/** Thrown when the owner picker submits a non-household member id — the
+ *  action maps it to a field error (EDR-014; the #45 cross-tenant lesson). */
+export class ForeignOwnerError extends Error {}
+
+/** Thrown when the edit's compare-and-swap finds the card changed since the
+ *  sheet was seeded — the action maps it to a reload message, never a
+ *  silent overwrite (review finding: lost update). */
+export class StaleCardError extends Error {}
+
+/**
+ * Update a card from validated form input (issue #47). Same conventions as
+ * create (toUpdateCardData); the owner FK is verified against the caller's
+ * household BEFORE the write — the card WHERE alone doesn't cover a
+ * client-submitted member id. Cross-household/missing card ids update zero
+ * rows and throw. Audited with the changed field names (not values — the
+ * before/after diff stays in the event details' changedFields list).
+ */
+export async function updateCardForUser(
+  userId: string,
+  input: EditCardInput
+): Promise<{ cardId: string }> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) throw new Error("Not authorized")
+  if (input.ownerMemberId != null) {
+    const ok = await verifyHouseholdMember(householdId, input.ownerMemberId)
+    if (!ok) throw new ForeignOwnerError("Pick a member of your household.")
+  }
+  const data = toUpdateCardData(input)
+  const { status, before } = await updateCard(
+    householdId,
+    input.cardId,
+    data,
+    input.expectedUpdatedAt
+  )
+  if (status === "not-found") throw new Error("Not authorized")
+  if (status === "conflict") throw new StaleCardError("card changed since seed")
+  await emitDomainEvent({
+    type: "CardUpdated",
+    userId,
+    householdId,
+    cardId: input.cardId,
+    cardName: input.cardName,
+    changedFields: changedCardFields(before, data),
+  })
+  return { cardId: input.cardId }
+}
+
+/**
+ * Delete a card and its Restrict-linked rows (issue #47 + #57's delete
+ * half) — the explicit audited removal Marti chose 2026-07-25 (recorded
+ * deviation from the blueprint's archive-first CardArchived model). The
+ * repository resolves scheduled payments, statements, and the autopay link
+ * in ONE transaction; the event records exactly what went. Cross-household
+ * or missing ids delete zero rows and throw.
+ */
+export async function deleteCardForUser(
+  userId: string,
+  cardId: string
+): Promise<{ cardName: string }> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) throw new Error("Not authorized")
+  const result = await deleteCardWithDependents(householdId, cardId)
+  if (!result || result.deleted === 0) throw new Error("Not authorized")
+  await emitDomainEvent({
+    type: "CardDeleted",
+    userId,
+    householdId,
+    cardId,
+    cardName: result.cardName ?? "Card",
+    removedScheduledPayments: result.removedScheduledPayments,
+    removedStatements: result.removedStatements,
+    removedAutopayLink: result.removedAutopayLink,
+  })
+  return { cardName: result.cardName ?? "Card" }
+}
+
+/**
+ * Fresh Restrict-dependent counts for the delete confirmation (issue #57).
+ * Read AT DIALOG-OPEN TIME, not page load — the seed's counts can be stale
+ * by the time the user deletes (review finding: the confirm must list what
+ * will actually go). null ⇒ no such card in the caller's household.
+ */
+export async function getCardDependentsForUser(userId: string, cardId: string) {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) return null
+  return findCardDependents(householdId, cardId)
+}
+
+/** Household members for the owner picker (issue #78); [] when no household. */
+export async function getHouseholdMembersForUser(
+  userId: string
+): Promise<Array<{ id: string; displayName: string }>> {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) return []
+  return findHouseholdMembers(householdId)
 }
 
 /**

@@ -4,8 +4,13 @@
  */
 import { cache } from "react"
 
-import { getCardPortfolio } from "./service"
+import { getCardPortfolio, getHouseholdMembersForUser } from "./service"
 
 export const getPortfolioForUser = cache(async (userId: string) => {
   return getCardPortfolio(userId)
+})
+
+/** Household members for the owner picker (issue #78). */
+export const getMembersForUser = cache(async (userId: string) => {
+  return getHouseholdMembersForUser(userId)
 })
