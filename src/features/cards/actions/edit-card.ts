@@ -13,7 +13,11 @@ import { z } from "zod"
 import { auth } from "@/lib/auth"
 import { hasPermission } from "@/lib/auth/constants"
 import { editCardSchema } from "@/features/cards/schemas/edit-card-schema"
-import { ForeignOwnerError, updateCardForUser } from "@/features/cards/server/service"
+import {
+  ForeignOwnerError,
+  StaleCardError,
+  updateCardForUser,
+} from "@/features/cards/server/service"
 
 export type EditCardState = {
   success: boolean
@@ -58,6 +62,14 @@ export async function editCard(
         success: false,
         message: "Check the highlighted fields.",
         fieldErrors: { ownerMemberId: [error.message] },
+        values: rawValues(formData),
+      }
+    }
+    if (error instanceof StaleCardError) {
+      return {
+        success: false,
+        message:
+          "This card changed since you opened the form — close the sheet and reopen it to get the latest values. Nothing was saved.",
         values: rawValues(formData),
       }
     }

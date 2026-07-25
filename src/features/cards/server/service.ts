@@ -34,6 +34,7 @@ import { toFinanceCard } from "./mappers"
 import {
   createCard,
   deleteCardWithDependents,
+  findCardDependents,
   findHouseholdCards,
   findHouseholdIdForUser,
   findHouseholdMembers,
@@ -75,6 +76,7 @@ export interface PortfolioCard {
   /** Provenance: true when a displayed derived figure rests on unconfirmed inputs. */
   hasEstimatedInputs: boolean
   /** Edit-seed fields the finance shape omits (issue #47). */
+  updatedAt: Date
   statementCloseDay: number | null
   paymentNote: string | null
   notes: string | null
@@ -136,6 +138,7 @@ function toPortfolioCard(
     finance,
     hasEstimatedInputs:
       row.aprSource === "UNKNOWN" || row.limitSource === "UNKNOWN" || row.minimumSource === "UNKNOWN",
+    updatedAt: row.updatedAt,
     statementCloseDay: row.statementCloseDay,
     paymentNote: row.paymentNote,
     notes: row.notes,
@@ -159,6 +162,12 @@ export async function createCardForUser(
   input: CreateCardInput
 ): Promise<{ cardId: string }> {
   const householdId = await findOrCreateHouseholdForUser(userId)
+  // Owner FK verified on CREATE exactly as on edit (review finding — the
+  // #45 lesson applies to every path that persists a client-submitted id).
+  if (input.ownerMemberId != null) {
+    const ok = await verifyHouseholdMember(householdId, input.ownerMemberId)
+    if (!ok) throw new ForeignOwnerError("Pick a member of your household.")
+  }
   const card = await createCard(householdId, toCreateCardData(input))
   await emitDomainEvent({
     type: "CardAdded",
@@ -173,6 +182,11 @@ export async function createCardForUser(
 /** Thrown when the owner picker submits a non-household member id — the
  *  action maps it to a field error (EDR-014; the #45 cross-tenant lesson). */
 export class ForeignOwnerError extends Error {}
+
+/** Thrown when the edit's compare-and-swap finds the card changed since the
+ *  sheet was seeded — the action maps it to a reload message, never a
+ *  silent overwrite (review finding: lost update). */
+export class StaleCardError extends Error {}
 
 /**
  * Update a card from validated form input (issue #47). Same conventions as
@@ -193,8 +207,14 @@ export async function updateCardForUser(
     if (!ok) throw new ForeignOwnerError("Pick a member of your household.")
   }
   const data = toUpdateCardData(input)
-  const { updated, before } = await updateCard(householdId, input.cardId, data)
-  if (updated === 0) throw new Error("Not authorized")
+  const { status, before } = await updateCard(
+    householdId,
+    input.cardId,
+    data,
+    input.expectedUpdatedAt
+  )
+  if (status === "not-found") throw new Error("Not authorized")
+  if (status === "conflict") throw new StaleCardError("card changed since seed")
   await emitDomainEvent({
     type: "CardUpdated",
     userId,
@@ -233,6 +253,18 @@ export async function deleteCardForUser(
     removedAutopayLink: result.removedAutopayLink,
   })
   return { cardName: result.cardName ?? "Card" }
+}
+
+/**
+ * Fresh Restrict-dependent counts for the delete confirmation (issue #57).
+ * Read AT DIALOG-OPEN TIME, not page load — the seed's counts can be stale
+ * by the time the user deletes (review finding: the confirm must list what
+ * will actually go). null ⇒ no such card in the caller's household.
+ */
+export async function getCardDependentsForUser(userId: string, cardId: string) {
+  const householdId = await findHouseholdIdForUser(userId)
+  if (!householdId) return null
+  return findCardDependents(householdId, cardId)
 }
 
 /** Household members for the owner picker (issue #78); [] when no household. */

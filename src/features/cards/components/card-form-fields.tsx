@@ -9,6 +9,8 @@
  * action's raw-string echo after a failure (React 19 resets), `seed` is
  * the edit form's current-card strings; add passes no seed.
  */
+import { useState } from "react"
+
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -18,6 +20,12 @@ export interface HouseholdMemberOption {
   id: string
   displayName: string
 }
+
+/** The Input primitive's field recipe for a native select — text-base on
+ *  mobile so iOS Safari never auto-zooms on focus (design QA DS-47-003;
+ *  Input is the reference: `text-base md:text-sm`). */
+const SELECT_CLASS =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
 
 /** Join the ids that actually exist in the DOM right now. */
 function describedBy(...ids: Array<string | false | undefined>): string | undefined {
@@ -57,6 +65,12 @@ export function CardFormFields({
   members: HouseholdMemberOption[]
 }) {
   const def = (key: string) => values?.[key] ?? seed?.[key]
+
+  // CONTROLLED (review finding): React 19 resets the form after the action
+  // settles; a defaultValue select would snap back to its mount-time value
+  // even though the user changed it. Controlled state re-asserts the user's
+  // choice after every reset.
+  const [owner, setOwner] = useState(def("ownerMemberId") ?? "")
 
   return (
     <>
@@ -115,14 +129,15 @@ export function CardFormFields({
           <select
             id="ownerMemberId"
             name="ownerMemberId"
-            defaultValue={def("ownerMemberId") ?? ""}
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
             data-testid="owner-select"
             aria-invalid={!!errors?.ownerMemberId?.length || undefined}
             aria-describedby={describedBy(
               "ownerMemberId-hint",
               !!errors?.ownerMemberId?.length && "ownerMemberId-error"
             )}
-            className={`flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+            className={`${SELECT_CLASS} ${
               errors?.ownerMemberId?.length ? "border-destructive" : ""
             }`}
           >
@@ -181,9 +196,15 @@ export function CardFormFields({
               Track when a promotional 0% APR period ends
             </p>
           </div>
+          {/* The submitted value rides a CONTROLLED hidden input, not the
+              Radix Switch's form association: React 19's post-action reset
+              restores the Switch's internal hidden input to its mount-time
+              default while the visual (controlled) state keeps the user's
+              choice — a silent FormData desync (review finding). The
+              controlled input re-asserts on every render. */}
+          <input type="hidden" name="hasPromo" value={hasPromo ? "on" : ""} />
           <Switch
             id="hasPromo"
-            name="hasPromo"
             checked={hasPromo}
             onCheckedChange={onHasPromoChange}
             aria-describedby="hasPromo-hint"

@@ -1,27 +1,36 @@
 /**
  * Card edit + delete e2e (issue #47, #57's delete half, #78 owner). Runs in
- * authenticated-mutations. Hermetic: every card carries the `E2E ` prefix
- * and `deleteE2eCards()` sweeps before/after (delete-e2e-cards works on
- * leftovers because the app's own delete resolves Restrict rows first; the
- * raw script sweep only ever sees cards whose payments this spec removed
- * through the app). Date-independent throughout.
+ * authenticated-mutations. Hermetic with a spec-OWN prefix (`E2EEDIT `,
+ * review finding): add-card.spec runs in a parallel worker sweeping the
+ * bare `E2E ` prefix — a shared prefix would let either spec delete the
+ * other's live fixtures. Cleanup order matters (review finding): the
+ * payment tag is swept BEFORE the card sweep, so a failure that strands
+ * the dependents fixture can never make the raw card sweep hit the
+ * Restrict FK (P2003) and poison every later run. Date-independent.
  */
 import { execSync } from "node:child_process"
 
 import { expect, test, type Page } from "@playwright/test"
 
-const deleteE2eCards = () => {
-  execSync("pnpm exec tsx scripts/delete-e2e-cards.ts", { stdio: "inherit" })
+const PREFIX = "E2EEDIT "
+const DEP_TAG = "E2E-DEL-DEP"
+
+const cleanup = () => {
+  // Payments first (Restrict FK), then the cards themselves.
+  execSync(`pnpm exec tsx scripts/e2e-scheduled-payment.ts delete ${DEP_TAG}`, {
+    stdio: "inherit",
+  })
+  execSync(`pnpm exec tsx scripts/delete-e2e-cards.ts "${PREFIX}"`, { stdio: "inherit" })
 }
 
 test.describe.configure({ mode: "serial" })
 
-test.beforeAll(deleteE2eCards)
-test.afterAll(deleteE2eCards)
+test.beforeAll(cleanup)
+test.afterAll(cleanup)
 
 /** Create a minimal E2E card through the real add flow; returns its name. */
 async function createCard(page: Page, suffix: string, fields: Record<string, string> = {}) {
-  const name = `E2E Edit ${suffix} ${Date.now()}`
+  const name = `${PREFIX}${suffix} ${Date.now()}`
   await page.goto("/cards")
   await page.getByRole("button", { name: "+ Add Card" }).click()
   await page.getByLabel("Card name *").fill(name)
@@ -134,7 +143,7 @@ test("delete WITH dependents (issue #57): dialog lists them, removal is transact
   const name = await createCard(page, "DEP")
   // Restrict-FK row on the new card: a $77.00 scheduled payment, distinct
   // amount + tag per the parallel-spec rule.
-  execSync(`pnpm exec tsx scripts/e2e-scheduled-payment.ts create 5 7700 E2E-DEL-DEP "${name}"`, {
+  execSync(`pnpm exec tsx scripts/e2e-scheduled-payment.ts create 5 7700 ${DEP_TAG} "${name}"`, {
     stdio: "inherit",
   })
 

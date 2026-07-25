@@ -9,7 +9,7 @@
  * - provenance is presence-based: MANUAL when the user supplied a value,
  *   else UNKNOWN (aprSource is MANUAL when either an APR or a promo was
  *   supplied);
- - an owner member ⇒ MEMBER attribution; none ⇒ SHARED (issue #78 — the
+ * - an owner member ⇒ MEMBER attribution; none ⇒ SHARED (issue #78 — the
  *   "Shared" concept IS the absence of an owner); sync stays MANUAL until
  *   aggregator linking arrives.
  */

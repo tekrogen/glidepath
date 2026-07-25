@@ -121,23 +121,30 @@ export async function verifyHouseholdMember(
 
 /**
  * Update a card within the caller's household (issue #47). Household-scoped
- * WHERE (EDR-014): a cross-household or missing id updates zero rows.
- * Promo periods are inside the CreditCard aggregate (EDR-017) — the edit
- * replaces the ACTIVE promo set exactly like the tracker import's per-card
- * path: delete ACTIVE rows, recreate when the form's promo is on. The
- * card update and promo replace share one transaction. Returns the
+ * WHERE (EDR-014): a cross-household or missing id matches zero rows
+ * ("not-found"). The write is a compare-and-swap on updatedAt (review
+ * finding: a stale edit-sheet seed must not silently overwrite a
+ * concurrent edit — "conflict", nothing written). Promo periods are inside
+ * the CreditCard aggregate (EDR-017) — the edit replaces the ACTIVE promo
+ * set exactly like the tracker import's per-card path. The read, the CAS
+ * update, and the promo replace share one transaction. Returns the
  * PRE-update field values so the service can diff for the audit event.
  */
 export async function updateCard(
   householdId: string,
   cardId: string,
-  data: UpdateCardData
-): Promise<{ updated: number; before: Record<string, unknown> | null }> {
+  data: UpdateCardData,
+  expectedUpdatedAt: Date
+): Promise<{
+  status: "ok" | "not-found" | "conflict"
+  before: Record<string, unknown> | null
+}> {
   const { promo, ...card } = data
   return prisma.$transaction(async (tx) => {
     const before = await tx.creditCard.findFirst({
       where: { id: cardId, householdId },
       select: {
+        updatedAt: true,
         cardName: true,
         lastFour: true,
         issuer: true,
@@ -156,11 +163,14 @@ export async function updateCard(
         },
       },
     })
-    const result = await tx.creditCard.updateMany({
+    if (!before) return { status: "not-found" as const, before: null }
+    if (before.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+      return { status: "conflict" as const, before: null }
+    }
+    await tx.creditCard.updateMany({
       where: { id: cardId, householdId },
       data: card,
     })
-    if (result.count === 0) return { updated: 0, before: null }
     await tx.promoPeriod.deleteMany({ where: { cardId, status: "ACTIVE" } })
     if (promo) {
       await tx.promoPeriod.create({
@@ -174,7 +184,7 @@ export async function updateCard(
         },
       })
     }
-    return { updated: result.count, before }
+    return { status: "ok" as const, before }
   })
 }
 

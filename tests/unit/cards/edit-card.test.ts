@@ -11,9 +11,11 @@ import {
   toUpdateCardData,
   type UpdateCardData,
 } from "@/features/cards/server/create-card-data"
+import { dependentsSummary } from "@/features/cards/utils/dependents-summary"
 
 const FORM = {
   cardId: "card-1",
+  expectedUpdatedAt: "2026-07-25T12:00:00.000Z",
   cardName: "Meridian Blue",
   issuer: "Chase",
   lastFour: "4412",
@@ -41,6 +43,18 @@ describe("editCardSchema", () => {
     const { cardId: _omitted, ...rest } = FORM
     const parsed = editCardSchema.safeParse(rest)
     expect(parsed.success).toBe(false)
+  })
+
+  it("requires a valid row version (the compare-and-swap guard)", () => {
+    const { expectedUpdatedAt: _omitted, ...rest } = FORM
+    expect(editCardSchema.safeParse(rest).success).toBe(false)
+    expect(editCardSchema.safeParse({ ...FORM, expectedUpdatedAt: "not-a-date" }).success).toBe(
+      false
+    )
+    const parsed = editCardSchema.safeParse(FORM)
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) return
+    expect(parsed.data.expectedUpdatedAt).toEqual(new Date("2026-07-25T12:00:00.000Z"))
   })
 
   it("applies the shared rules: bad money rejected, promo needs an end date", () => {
@@ -123,5 +137,32 @@ describe("changedCardFields", () => {
 
   it("null before (missing card) diffs to nothing", () => {
     expect(changedCardFields(null, data)).toEqual([])
+  })
+})
+
+describe("dependentsSummary", () => {
+  const deps = (s: number, st: number, a: boolean) => ({
+    scheduledPaymentCount: s,
+    statementCount: st,
+    hasAutopayLink: a,
+  })
+
+  it("nothing rides ⇒ null (plain delete copy)", () => {
+    expect(dependentsSummary(deps(0, 0, false))).toBeNull()
+  })
+
+  it("singulars and plurals", () => {
+    expect(dependentsSummary(deps(1, 0, false))).toBe("1 scheduled payment")
+    expect(dependentsSummary(deps(3, 0, false))).toBe("3 scheduled payments")
+    expect(dependentsSummary(deps(0, 1, false))).toBe("1 statement")
+    expect(dependentsSummary(deps(0, 2, false))).toBe("2 statements")
+    expect(dependentsSummary(deps(0, 0, true))).toBe("its autopay link")
+  })
+
+  it("two parts join with 'and'; three parts comma + 'and'", () => {
+    expect(dependentsSummary(deps(2, 1, false))).toBe("2 scheduled payments and 1 statement")
+    expect(dependentsSummary(deps(3, 2, true))).toBe(
+      "3 scheduled payments, 2 statements and its autopay link"
+    )
   })
 })

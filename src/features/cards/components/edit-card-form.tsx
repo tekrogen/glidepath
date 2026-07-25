@@ -28,11 +28,16 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { deleteCard } from "@/features/cards/actions/delete-card"
+import {
+  getCardDependents,
+  type CardDependents,
+} from "@/features/cards/actions/get-card-dependents"
 import { editCard, type EditCardState } from "@/features/cards/actions/edit-card"
 import {
   CardFormFields,
   type HouseholdMemberOption,
 } from "@/features/cards/components/card-form-fields"
+import { dependentsSummary } from "@/features/cards/utils/dependents-summary"
 
 const initialState: EditCardState = { success: false, message: "" }
 
@@ -46,27 +51,6 @@ export interface EditCardSeed {
   scheduledPaymentCount: number
   statementCount: number
   hasAutopayLink: boolean
-}
-
-/** "3 scheduled payments, 1 statement and its autopay link" — or null when nothing rides. */
-export function dependentsSummary(seed: {
-  scheduledPaymentCount: number
-  statementCount: number
-  hasAutopayLink: boolean
-}): string | null {
-  const parts: string[] = []
-  if (seed.scheduledPaymentCount > 0) {
-    parts.push(
-      `${seed.scheduledPaymentCount} scheduled payment${seed.scheduledPaymentCount === 1 ? "" : "s"}`
-    )
-  }
-  if (seed.statementCount > 0) {
-    parts.push(`${seed.statementCount} statement${seed.statementCount === 1 ? "" : "s"}`)
-  }
-  if (seed.hasAutopayLink) parts.push("its autopay link")
-  if (parts.length === 0) return null
-  if (parts.length === 1) return parts[0]
-  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`
 }
 
 export function EditCardForm({
@@ -84,6 +68,11 @@ export function EditCardForm({
   const [state, formAction, pending] = useActionState(editCard, initialState)
   const [hasPromo, setHasPromo] = useState(seed.hasPromo)
   const [deleting, startDelete] = useTransition()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  // Fresh dependents, read when the confirm opens (review finding: the
+  // page-load seed counts can be stale by delete time). Seed is the
+  // fallback while the read is in flight.
+  const [freshDeps, setFreshDeps] = useState<CardDependents | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
   const busy = pending || deleting
 
@@ -103,7 +92,20 @@ export function EditCardForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run per action result only
   }, [state])
 
+  const handleConfirmOpenChange = (open: boolean) => {
+    setConfirmOpen(open)
+    if (open) {
+      setFreshDeps(null)
+      void getCardDependents(seed.cardId).then((deps) => {
+        if (deps) setFreshDeps(deps)
+      })
+    }
+  }
+
   const handleDelete = () => {
+    // Double-activation guard (review finding): the second click of a
+    // double-tap must be a no-op, never a false "could not delete" toast.
+    if (deleting) return
     startDelete(async () => {
       const res = await deleteCard(seed.cardId)
       if (!res.success) {
@@ -116,11 +118,21 @@ export function EditCardForm({
     })
   }
 
-  const dependents = dependentsSummary(seed)
+  const dependents = dependentsSummary(
+    freshDeps
+      ? {
+          scheduledPaymentCount: freshDeps.scheduledPayments,
+          statementCount: freshDeps.statements,
+          hasAutopayLink: freshDeps.autopayLink,
+        }
+      : seed
+  )
 
   return (
     <form action={formAction} className="space-y-6" noValidate aria-busy={busy}>
       <input type="hidden" name="cardId" value={seed.cardId} />
+      {/* Compare-and-swap version: the row's updatedAt at seed time. */}
+      <input type="hidden" name="expectedUpdatedAt" value={seed.values.expectedUpdatedAt} />
       <p role="status" className="sr-only">
         {pending ? "Saving card…" : deleting ? "Deleting card…" : ""}
       </p>
@@ -147,9 +159,11 @@ export function EditCardForm({
       />
 
       {/* Footer per the card-management mockup: destructive Delete left,
-          Cancel · Save right. Delete is confirm-gated and lists dependents. */}
-      <div className="flex items-center justify-between gap-3">
-        <AlertDialog>
+          Cancel · Save right. Delete is confirm-gated and lists dependents.
+          flex-wrap (design QA DS-47-005): the three buttons sit at zero
+          slack at 390 — the pending spinner must wrap, never overflow. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <AlertDialog open={confirmOpen} onOpenChange={handleConfirmOpenChange}>
           <AlertDialogTrigger asChild>
             <Button
               type="button"
@@ -175,7 +189,17 @@ export function EditCardForm({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep card</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} data-testid="delete-card-confirm">
+              {/* Destructive-of-history action must NOT wear the constructive
+                  primary (design QA DS-47-001). error-text is the AA-safe red
+                  fill in both modes (7.46:1 light / ~7.9:1 dark with
+                  background-colored text); bg-destructive + white fails light
+                  AA at 3.61:1 — measured, do not "simplify" back. */}
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={deleting}
+                data-testid="delete-card-confirm"
+                className="bg-error-text text-background hover:bg-error-text/90"
+              >
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>

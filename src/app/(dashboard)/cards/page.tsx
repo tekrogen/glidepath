@@ -60,6 +60,7 @@ export default async function CardsPage() {
         cardName: c.cardName,
         hasPromo: f.promo != null,
         values: {
+          expectedUpdatedAt: c.updatedAt.toISOString(),
           cardName: c.cardName,
           issuer: c.issuer,
           lastFour: c.lastFour ?? "",

@@ -180,7 +180,10 @@ export function CardsTable({
               <th className="px-4 py-3 text-left text-xs font-medium tracking-wide uppercase text-muted-foreground">
                 Status
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium tracking-wide uppercase text-muted-foreground">
+              {/* Sticky (design QA DS-47-002): 10 columns overflow a 1440
+                  content area — row actions must never hide behind an
+                  unindicated horizontal scroll. bg matches the thead band. */}
+              <th className="sticky right-0 bg-muted/40 px-4 py-3 text-right text-xs font-medium tracking-wide uppercase text-muted-foreground backdrop-blur">
                 Actions
               </th>
             </tr>
@@ -263,13 +266,14 @@ export function CardsTable({
                   <td className="px-4 py-3">
                     <StatusBadge status={resolveStatusBadge(effectiveLifecycle, r.alert)} />
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="sticky right-0 bg-card px-4 py-3 text-right">
                     <span className="inline-flex items-center gap-1">
                       {/* Per-row edit entry point — the wireframe-2d pencil (issue #47). */}
                       <button
                         type="button"
                         onClick={() => setEditing(r.edit)}
                         aria-label={`Edit ${r.cardName}`}
+                        title="Edit card"
                         data-testid="edit-card-trigger"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       >

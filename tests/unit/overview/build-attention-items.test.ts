@@ -19,6 +19,7 @@ const card = (over: CardOverrides): PortfolioCard => ({
   dueCovered: false,
   autopayActive: false,
   autopayProviderUrl: null,
+  updatedAt: new Date(0),
   statementCloseDay: null,
   paymentNote: null,
   notes: null,
