@@ -21,7 +21,9 @@ export function AddCardCta({ label = "Add a card" }: { label?: string }) {
       >
         {label}
       </button>
-      <AddCardSheet open={open} onOpenChange={setOpen} />
+      {/* First-run contexts precede the household — no members exist yet,
+          so the owner picker correctly offers only "Shared" (issue #78). */}
+      <AddCardSheet open={open} onOpenChange={setOpen} members={[]} />
     </>
   )
 }

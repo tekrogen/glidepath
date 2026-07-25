@@ -9,10 +9,12 @@
  * - provenance is presence-based: MANUAL when the user supplied a value,
  *   else UNKNOWN (aprSource is MANUAL when either an APR or a promo was
  *   supplied);
- * - manual cards are SHARED with no owner member and MANUAL sync until
- *   household management / aggregator linking arrive.
+ - an owner member ⇒ MEMBER attribution; none ⇒ SHARED (issue #78 — the
+ *   "Shared" concept IS the absence of an owner); sync stays MANUAL until
+ *   aggregator linking arrives.
  */
 import type { CreateCardInput } from "@/features/cards/schemas/create-card-schema"
+import type { EditCardInput } from "@/features/cards/schemas/edit-card-schema"
 
 import { issuerKeyFor } from "./tracker-import"
 
@@ -30,8 +32,8 @@ export interface CreateCardData {
   minimumPaymentMinor: bigint | null
   paymentNote: string | null
   notes: string | null
-  ownerMemberId: null
-  attribution: "SHARED"
+  ownerMemberId: string | null
+  attribution: "MEMBER" | "SHARED"
   syncStatus: "MANUAL"
   limitSource: "MANUAL" | "UNKNOWN"
   aprSource: "MANUAL" | "UNKNOWN"
@@ -59,8 +61,8 @@ export function toCreateCardData(input: CreateCardInput): CreateCardData {
     minimumPaymentMinor: input.minimumPaymentMinor,
     paymentNote: input.paymentNote,
     notes: input.notes,
-    ownerMemberId: null,
-    attribution: "SHARED",
+    ownerMemberId: input.ownerMemberId,
+    attribution: input.ownerMemberId != null ? "MEMBER" : "SHARED",
     syncStatus: "MANUAL",
     limitSource: input.creditLimitMinor != null ? "MANUAL" : "UNKNOWN",
     aprSource: input.regularAprBps != null || promoActive ? "MANUAL" : "UNKNOWN",
@@ -73,6 +75,56 @@ export function toCreateCardData(input: CreateCardInput): CreateCardData {
         }
       : null,
   }
+}
+
+/**
+ * Update mapping (issue #47): identical conventions to create — presence-
+ * based provenance, promo sheltering, owner attribution — minus syncStatus,
+ * which a manual edit must never clobber.
+ */
+export type UpdateCardData = Omit<CreateCardData, "syncStatus">
+
+export function toUpdateCardData(input: EditCardInput): UpdateCardData {
+  const { syncStatus: _syncStatus, ...data } = toCreateCardData(input)
+  return data
+}
+
+/**
+ * Field names a card update changed — the audit event's changedFields
+ * (names only, never values; the audit row stays PII-light). Bigints and
+ * strings compare strictly; the promo compares by the ACTIVE promo's end
+ * date + post-promo rate (its sheltered balance derives from the balance,
+ * which the scalar list already covers).
+ */
+export function changedCardFields(
+  before: Record<string, unknown> | null,
+  data: UpdateCardData
+): string[] {
+  if (!before) return []
+  const changed: string[] = []
+  const scalarKeys = [
+    "cardName",
+    "lastFour",
+    "issuer",
+    "creditLimitMinor",
+    "currentBalanceMinor",
+    "regularAprBps",
+    "paymentDueDay",
+    "statementCloseDay",
+    "minimumPaymentMinor",
+    "paymentNote",
+    "notes",
+    "ownerMemberId",
+  ] as const
+  for (const key of scalarKeys) {
+    if (before[key] !== data[key]) changed.push(key)
+  }
+  const beforePromo = (before.promoPeriods as Array<{ endsOn: Date; regularAprBpsAfter: number | null }> | undefined)?.[0]
+  const promoChanged =
+    (beforePromo?.endsOn?.getTime() ?? null) !== (data.promo?.endsOn.getTime() ?? null) ||
+    (beforePromo?.regularAprBpsAfter ?? null) !== (data.promo?.regularAprBpsAfter ?? null)
+  if (promoChanged) changed.push("promo")
+  return changed
 }
 
 /**

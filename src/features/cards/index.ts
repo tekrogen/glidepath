@@ -1,4 +1,4 @@
-export { getPortfolioForUser } from "./server/queries"
+export { getMembersForUser, getPortfolioForUser } from "./server/queries"
 export type { CardPortfolio, PortfolioCard } from "./server/service"
 export { FreezeControl } from "./components/freeze-control"
 export { StatusBadge } from "./components/status-badge"

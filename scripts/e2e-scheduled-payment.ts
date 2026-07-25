@@ -2,7 +2,7 @@
  * Insert / remove the reschedule e2e spec's temporary ScheduledPayment
  * (issue #44).
  *
- *   pnpm exec tsx scripts/e2e-scheduled-payment.ts create [daysOut=10] [amountCents=4200] [tag=E2E-RESCHEDULE]
+ *   pnpm exec tsx scripts/e2e-scheduled-payment.ts create [daysOut=10] [amountCents=4200] [tag=E2E-RESCHEDULE] [cardName=Meridian Blue]
  *   pnpm exec tsx scripts/e2e-scheduled-payment.ts delete [tag=E2E-RESCHEDULE]
  *
  * Specs that run in parallel workers MUST use distinct amounts + tags —
@@ -28,14 +28,15 @@ async function main() {
     const tag = (command === "create" ? process.argv[5] : process.argv[3]) ?? DEFAULT_NOTE
     if (command === "create") {
       const amountMinor = process.argv[4] ? BigInt(process.argv[4]) : 4200n
+      const cardName = process.argv[6] ?? CARD_NAME
       const card = await prisma.creditCard.findFirst({
         where: {
-          cardName: CARD_NAME,
+          cardName,
           household: { members: { some: { user: { email: DEMO_EMAIL } } } },
         },
         select: { id: true },
       })
-      if (!card) throw new Error(`Card "${CARD_NAME}" not found for the demo household`)
+      if (!card) throw new Error(`Card "${cardName}" not found for the demo household`)
       // Leftover from an aborted run must not duplicate. Scoped to the demo
       // household, never note-text alone (review finding).
       await prisma.scheduledPayment.deleteMany({

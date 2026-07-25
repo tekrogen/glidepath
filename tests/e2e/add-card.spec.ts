@@ -49,8 +49,10 @@ test("sidebar CTA is a real button (no disabled span) and empty submit surfaces 
 
   await expect(page.getByText("Give the card a name.")).toBeVisible()
   await expect(page.getByText("Enter the issuer.")).toBeVisible()
-  const banner = page.getByRole("alert")
-  await expect(banner).toContainText("Check the highlighted fields.")
+  // Field errors carry role="alert" too since #47's shared FieldError (the
+  // #45 DS-011 convention) — target the banner by its copy.
+  const banner = page.getByRole("alert").filter({ hasText: "Check the highlighted fields." })
+  await expect(banner).toBeVisible()
   await expect(banner).toBeFocused()
 })
 

@@ -7,8 +7,8 @@ import { redirect } from "next/navigation"
 
 import { auth } from "@/lib/auth"
 import { daysUntil, utilization } from "@/lib/finance"
-import { formatAprBps, formatStampDate } from "@/lib/formatting"
-import { getPortfolioForUser } from "@/features/cards"
+import { formatAprBps, formatStampDate, toDollarInput, toPercentInput } from "@/lib/formatting"
+import { getMembersForUser, getPortfolioForUser } from "@/features/cards"
 import { CardsEmptyState } from "@/features/cards/components/cards-empty-state"
 import { CardsTable, type CardsTableRow } from "@/features/cards/components/cards-table"
 
@@ -20,12 +20,20 @@ export default async function CardsPage() {
     redirect("/signin?callbackUrl=/cards")
   }
 
-  const { cards } = await getPortfolioForUser(session.user.id)
+  const [{ cards }, members] = await Promise.all([
+    getPortfolioForUser(session.user.id),
+    getMembersForUser(session.user.id),
+  ])
   const today = new Date()
 
   const rows: CardsTableRow[] = cards.map((c) => {
     const f = c.finance
     const promoActive = f.promo != null && daysUntil(f.promo.endsOn, today) >= 0
+    // The edit seed reflects the STORED promo row (even date-expired — an
+    // expired promo is legal data, the status engine's business); the APR
+    // input seeds from wherever the rate lives (card-level, or the promo's
+    // after-rate while a promo shelters it).
+    const seedAprBps = f.promo != null ? f.promo.regularAprBpsAfter : f.regularAprBps
     return {
       id: c.id,
       cardName: c.cardName,
@@ -47,6 +55,30 @@ export default async function CardsPage() {
       dueDay: c.paymentDueDay,
       minPayCents: f.minimumPaymentMinor == null ? null : Number(f.minimumPaymentMinor),
       hasEstimatedInputs: c.hasEstimatedInputs,
+      edit: {
+        cardId: c.id,
+        cardName: c.cardName,
+        hasPromo: f.promo != null,
+        values: {
+          cardName: c.cardName,
+          issuer: c.issuer,
+          lastFour: c.lastFour ?? "",
+          creditLimit: f.limitMinor == null ? "" : toDollarInput(f.limitMinor),
+          currentBalance: toDollarInput(f.balanceMinor),
+          regularApr: seedAprBps == null ? "" : toPercentInput(seedAprBps),
+          promoEndsOn: f.promo == null ? "" : f.promo.endsOn.toISOString().slice(0, 10),
+          paymentDueDay: c.paymentDueDay?.toString() ?? "",
+          statementCloseDay: c.statementCloseDay?.toString() ?? "",
+          minimumPayment:
+            f.minimumPaymentMinor == null ? "" : toDollarInput(f.minimumPaymentMinor),
+          paymentNote: c.paymentNote ?? "",
+          notes: c.notes ?? "",
+          ownerMemberId: c.ownerMemberId ?? "",
+        },
+        scheduledPaymentCount: c.scheduledPaymentCount,
+        statementCount: c.statementCount,
+        hasAutopayLink: c.hasAutopayLink,
+      },
     }
   })
 
@@ -63,7 +95,7 @@ export default async function CardsPage() {
           {formatStampDate(new Date())} · Manual
         </p>
       </div>
-      {rows.length === 0 ? <CardsEmptyState /> : <CardsTable rows={rows} />}
+      {rows.length === 0 ? <CardsEmptyState /> : <CardsTable rows={rows} members={members} />}
     </div>
   )
 }

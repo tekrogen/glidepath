@@ -10,6 +10,8 @@ import type { DomainEvent } from "./types"
 
 const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   CardAdded: "CARD_ADDED",
+  CardUpdated: "CARD_UPDATED",
+  CardDeleted: "CARD_DELETED",
   CardFrozen: "CARD_FROZEN",
   CardUnfrozen: "CARD_UNFROZEN",
   TrackerImported: "TRACKER_IMPORTED",
@@ -62,6 +64,24 @@ function auditDetails(event: DomainEvent): string {
       householdId: event.householdId,
       intentId: event.intentId,
       expiredAt: event.expiredAt,
+    })
+  }
+  if (event.type === "CardUpdated") {
+    return JSON.stringify({
+      cardId: event.cardId,
+      cardName: event.cardName,
+      householdId: event.householdId,
+      changedFields: event.changedFields,
+    })
+  }
+  if (event.type === "CardDeleted") {
+    return JSON.stringify({
+      cardId: event.cardId,
+      cardName: event.cardName,
+      householdId: event.householdId,
+      removedScheduledPayments: event.removedScheduledPayments,
+      removedStatements: event.removedStatements,
+      removedAutopayLink: event.removedAutopayLink,
     })
   }
   return JSON.stringify({

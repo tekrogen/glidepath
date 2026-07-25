@@ -11,6 +11,7 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { auth } from "@/lib/auth";
+import { getMembersForUser } from "@/features/cards";
 import { getNotificationPanelForUser } from "@/features/notifications";
 import type { NotificationPanel } from "@/features/notifications";
 
@@ -22,13 +23,20 @@ const EMPTY_PANEL: NotificationPanel = { notifications: [], unreadCount: 0 };
 
 export default async function DashboardGroupLayout({ children }: DashboardGroupLayoutProps) {
   const session = await auth();
-  const panel = session?.user?.id
-    ? await getNotificationPanelForUser(session.user.id)
-    : EMPTY_PANEL;
+  // Members feed the add-card owner picker (issue #78) — the shell mounts
+  // the one AddCardSheet instance and, as a client component, cannot fetch.
+  const [panel, members] = session?.user?.id
+    ? await Promise.all([
+        getNotificationPanelForUser(session.user.id),
+        getMembersForUser(session.user.id),
+      ])
+    : [EMPTY_PANEL, []];
 
   return (
     <>
-      <AppShell notificationPanel={panel}>{children}</AppShell>
+      <AppShell notificationPanel={panel} householdMembers={members}>
+        {children}
+      </AppShell>
     </>
   );
 }

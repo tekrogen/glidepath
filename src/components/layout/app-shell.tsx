@@ -21,6 +21,7 @@ import { UserMenu } from "@/components/auth/ui/user-menu";
 import { AddCardTrigger } from "@/features/cards/components/add-card-trigger";
 import { AddCardSheet } from "@/features/cards/components/add-card-sheet";
 import { manageNavLinks, primaryNavLinks, type NavLink } from "@/lib/nav-links";
+import type { HouseholdMemberOption } from "@/features/cards/components/card-form-fields";
 import type { NotificationPanel } from "@/features/notifications";
 
 function NavItem({
@@ -107,9 +108,12 @@ function SidebarContent({
 export function AppShell({
   children,
   notificationPanel,
+  householdMembers,
 }: {
   children: React.ReactNode;
   notificationPanel: NotificationPanel;
+  /** Owner-picker options for the add-card sheet (issue #78). */
+  householdMembers: HouseholdMemberOption[];
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -149,7 +153,7 @@ export function AppShell({
         <SidebarContent pathname={pathname} onAddCard={openAddCard} />
       </aside>
 
-      <AddCardSheet open={addCardOpen} onOpenChange={setAddCardOpen} />
+      <AddCardSheet open={addCardOpen} onOpenChange={setAddCardOpen} members={householdMembers} />
 
       {/* Content column */}
       <div className="flex min-w-0 flex-1 flex-col">

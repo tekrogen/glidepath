@@ -30,6 +30,7 @@ describe("createCardSchema", () => {
       minimumPayment: "68.00",
       paymentNote: "$350/month",
       notes: "Bonus deadline in May",
+      ownerMemberId: "member-1",
     })
     expect(parsed.success).toBe(true)
     if (!parsed.success) return
@@ -47,6 +48,7 @@ describe("createCardSchema", () => {
       minimumPaymentMinor: 6800n,
       paymentNote: "$350/month",
       notes: "Bonus deadline in May",
+      ownerMemberId: "member-1",
     })
   })
 
@@ -68,6 +70,7 @@ describe("createCardSchema", () => {
       minimumPaymentMinor: null,
       paymentNote: null,
       notes: null,
+      ownerMemberId: null,
     })
   })
 

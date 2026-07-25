@@ -19,13 +19,16 @@ import {
 } from "@/components/ui/sheet"
 
 import { AddCardForm } from "./add-card-form"
+import type { HouseholdMemberOption } from "./card-form-fields"
 
 export function AddCardSheet({
   open,
   onOpenChange,
+  members,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  members: HouseholdMemberOption[]
 }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
@@ -45,7 +48,11 @@ export function AddCardSheet({
           <SheetDescription>Track a card manually, or link an institution.</SheetDescription>
         </SheetHeader>
         <div className="mt-6">
-          <AddCardForm onDone={() => onOpenChange(false)} onPendingChange={setPending} />
+          <AddCardForm
+            onDone={() => onOpenChange(false)}
+            onPendingChange={setPending}
+            members={members}
+          />
         </div>
         <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-border p-4">
           <div className="flex items-start gap-3">
