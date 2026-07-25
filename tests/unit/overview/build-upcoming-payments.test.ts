@@ -17,6 +17,9 @@ type CardOverrides = Partial<Omit<PortfolioCard, "finance">> & {
 }
 
 const card = (over: CardOverrides): PortfolioCard => ({
+  dueCovered: false,
+  autopayActive: false,
+  autopayProviderUrl: null,
   lastFour: null,
   issuer: "Chase",
   issuerKey: null,

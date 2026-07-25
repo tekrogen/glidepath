@@ -19,11 +19,18 @@ import type { Lifecycle } from "@/features/cards/utils/card-status"
 import { emitDomainEvent } from "@/server/events/publishers"
 
 import type { IntentDraftInput } from "../schemas/intent-draft-schema"
-import { intentExpiresAt, isIntentExpired, validateIntentComplete } from "../utils/intent"
+import {
+  intentExpiresAt,
+  isIntentExpired,
+  resolveHouseholdEventUser,
+  validateIntentComplete,
+} from "../utils/intent"
 import { toRunwayCard, toRunwayPayment } from "./mappers"
 import {
   createDraft,
   deleteDraft,
+  expireStaleDrafts,
+  IntentStateConflictError,
   findActiveDraft,
   findFundingAccounts,
   findIntentWithPayment,
@@ -38,7 +45,10 @@ import {
 /** A runway lane's card: engine shape + what the lane label renders. */
 export interface RunwayPageCard extends RunwayCard {
   cardName: string
+  lastFour: string | null
   lifecycle: Lifecycle
+  /** EDR-016: user confirmed autopay at the issuer — renders the "auto ✓" cue. */
+  autopayActive: boolean
 }
 
 export interface PaymentRunway {
@@ -62,7 +72,9 @@ export async function getPaymentRunway(userId: string, today = new Date()): Prom
   const cards = rows.map((row) => ({
     ...toRunwayCard(row),
     cardName: row.cardName,
+    lastFour: row.lastFour,
     lifecycle: row.lifecycle as Lifecycle,
+    autopayActive: row.autopayLink?.autopayActive ?? false,
   }))
   return {
     cards,
@@ -121,7 +133,9 @@ export async function getPaymentSetup(userId: string, now = new Date()): Promise
   const cards = rows.map((row) => ({
     ...toRunwayCard(row),
     cardName: row.cardName,
+    lastFour: row.lastFour,
     lifecycle: row.lifecycle as Lifecycle,
+    autopayActive: row.autopayLink?.autopayActive ?? false,
   }))
   return { cards, fundingAccounts, draft, asOf: now }
 }
@@ -190,6 +204,31 @@ export async function saveIntentDraftForUser(
   return { intentId: draft.id, expiresAt }
 }
 
+/**
+ * Expire stale DRAFT intents (issue #46 — the cron's job, deferred from
+ * #45). Flips DRAFT→EXPIRED transactionally, then emits one
+ * PaymentIntentExpired per intent, attributed to the household OWNER
+ * (events/audit require a userId; the cron has no session). A household
+ * with no user-bearing member skips the event — the flip still happened.
+ */
+export async function expireStaleIntents(
+  now = new Date()
+): Promise<{ expired: number }> {
+  const stale = await expireStaleDrafts(now)
+  for (const intent of stale) {
+    const userId = resolveHouseholdEventUser(intent.household.members)
+    if (!userId) continue
+    await emitDomainEvent({
+      type: "PaymentIntentExpired",
+      userId,
+      householdId: intent.householdId,
+      intentId: intent.id,
+      expiredAt: intent.expiresAt.toISOString(),
+    })
+  }
+  return { expired: stale.length }
+}
+
 /** Discard a live draft (start-over). Missing/foreign ids are a no-op. */
 export async function discardIntentDraftForUser(userId: string, intentId: string): Promise<void> {
   const householdId = await findHouseholdIdForUser(userId)
@@ -234,14 +273,24 @@ export async function confirmIntentForUser(
     throw new IntentRuleError("foreign-account", "Pick one of your funding accounts.")
   }
 
-  const { paymentId, alreadyRecorded } = await recordPaymentForIntent({
-    id: intent.id,
-    cardId: intent.cardId!,
-    fundingAccountId: intent.fundingAccountId,
-    amountMinor: intent.amountMinor!,
-    scheduledFor: intent.scheduledFor!,
-    note: intent.note,
-  })
+  let paymentId: string
+  let alreadyRecorded: boolean
+  try {
+    ;({ paymentId, alreadyRecorded } = await recordPaymentForIntent({
+      id: intent.id,
+      cardId: intent.cardId!,
+      fundingAccountId: intent.fundingAccountId,
+      amountMinor: intent.amountMinor!,
+      scheduledFor: intent.scheduledFor!,
+      note: intent.note,
+    }))
+  } catch (error) {
+    if (error instanceof IntentStateConflictError) {
+      // The expiry cron won the race mid-confirm; the payment rolled back.
+      throw new IntentRuleError("expired", "This draft expired just now — start a new payment.")
+    }
+    throw error
+  }
 
   if (!alreadyRecorded) {
     await emitDomainEvent({

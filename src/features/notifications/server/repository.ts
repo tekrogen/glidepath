@@ -1,8 +1,9 @@
 /**
  * Notifications repository — the only module that touches Prisma for the
  * notifications domain (arch doc §15). The table holds the CURRENT
- * attention occurrences (occurrence-lifecycle semantics, F15); mutations
- * are ownership-guarded by the userId in the where-clause.
+ * occurrence set — attention items ∪ payment reminders since issue #46
+ * (occurrence-lifecycle semantics, F15); mutations are ownership-guarded
+ * by the userId in the where-clause.
  */
 import { prisma } from "@/lib/db/prisma"
 import type { NotificationType } from "@prisma/client"
@@ -44,7 +45,9 @@ export async function replaceCurrentForUser(userId: string, rows: NotificationRo
 export async function findRecentForUser(userId: string, limit = 50) {
   return prisma.notification.findMany({
     where: { userId, dismissedAt: null },
-    orderBy: { createdAt: "desc" },
+    // Rows synced in one transaction share createdAt (Postgres transaction
+    // timestamp) — the id tiebreak keeps panel order deterministic.
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit,
   })
 }

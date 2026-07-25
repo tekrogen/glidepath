@@ -7,11 +7,15 @@ import {
   paydownRank,
   portfolioSummary,
   promoPayoffPlans,
+  runwayAggregate,
   utilization,
   type FinanceCard,
   type PortfolioSummary,
   type PromoPayoffPlan,
 } from "@/lib/finance"
+import { toRunwayCard, toRunwayPayment } from "@/features/payments/server/mappers"
+// Repository-level import only (no service) — keeps the module graph acyclic.
+import { findScheduledPayments } from "@/features/payments/server/repository"
 import {
   resolveAlert,
   resolveStatusBadge,
@@ -55,6 +59,12 @@ export interface PortfolioCard {
   /** Days until the next payment due date; null when no due day is known.
    *  Single-sourced from the alert engine's own input — no new math. */
   dueInDays: number | null
+  /** Autopay or a claiming SCHEDULED payment covers the next due (issue #46). */
+  dueCovered: boolean
+  /** EDR-016 provider metadata: user confirmed autopay at the issuer. */
+  autopayActive: boolean
+  /** Issuer payment page for the PAY link-out; null when unrecorded. */
+  autopayProviderUrl: string | null
   /** Finance shape for calculators / client-side what-if. */
   finance: FinanceCard
   /** Provenance: true when a displayed derived figure rests on unconfirmed inputs. */
@@ -73,17 +83,21 @@ export interface CardPortfolio {
 function toPortfolioCard(
   row: CardRow,
   priorities: Map<string, number>,
+  coveredByPayment: ReadonlyMap<string, boolean>,
   today: Date
 ): PortfolioCard {
   const finance = toFinanceCard(row)
   const daysUntilDue = dueInDays(row.paymentDueDay, today)
+  // Coverage (issue #46): a claiming SCHEDULED payment (the runway engine's
+  // own greedy-claim rule — one derivation path) OR confirmed provider
+  // autopay (EDR-016). Feeds the alert engine's dueCovered input.
+  const autopayActive = row.autopayLink?.autopayActive ?? false
+  const dueCovered = autopayActive || (coveredByPayment.get(row.id) ?? false)
   const alert = resolveAlert(
     {
       ...finance,
       dueInDays: daysUntilDue,
-      // Autopay/scheduled-payment coverage arrives in Phase 3 — until then a
-      // known due day within the window alerts unless the card is frozen.
-      dueCovered: false,
+      dueCovered,
     },
     today
   )
@@ -102,6 +116,9 @@ function toPortfolioCard(
     paydownPriority: priorities.get(row.id) ?? null,
     paymentDueDay: row.paymentDueDay,
     dueInDays: daysUntilDue,
+    dueCovered,
+    autopayActive,
+    autopayProviderUrl: row.autopayLink?.providerUrl ?? null,
     finance,
     hasEstimatedInputs:
       row.aprSource === "UNKNOWN" || row.limitSource === "UNKNOWN" || row.minimumSource === "UNKNOWN",
@@ -173,8 +190,22 @@ export async function getCardPortfolio(userId: string, today = new Date()): Prom
   const rows = await findHouseholdCards(householdId)
   const finance = rows.map(toFinanceCard)
   const priorities = paydownRank(finance, today)
+  // Payment-claim coverage comes from the runway engine's OWN projection —
+  // reusing its greedy-claim rule rather than re-deriving it (EDR-003/019).
+  const paymentRows = await findScheduledPayments(householdId)
+  const lanes = runwayAggregate(
+    rows.map(toRunwayCard),
+    paymentRows.map(toRunwayPayment),
+    today
+  ).lanes
+  const coveredByPayment = new Map(
+    lanes.map((lane) => [
+      lane.cardId,
+      lane.events.find((e) => e.kind === "due")?.covered ?? false,
+    ])
+  )
   const cards = rows
-    .map((r) => toPortfolioCard(r, priorities, today))
+    .map((r) => toPortfolioCard(r, priorities, coveredByPayment, today))
     .sort(
       (a, b) =>
         (a.paydownPriority ?? Number.POSITIVE_INFINITY) -

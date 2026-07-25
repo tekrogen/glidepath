@@ -105,6 +105,8 @@ export async function findHouseholdCards(householdId: string, includeArchived = 
     include: {
       promoPeriods: { where: { status: "ACTIVE" } },
       ownerMember: { select: { id: true, displayName: true } },
+      // EDR-016 metadata: feeds the PAY/AUTO affordances + dueCovered (issue #46).
+      autopayLink: { select: { autopayActive: true, providerUrl: true } },
     },
     orderBy: [{ cardName: "asc" }],
   })
