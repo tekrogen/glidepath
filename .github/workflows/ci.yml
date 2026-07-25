@@ -15,7 +15,7 @@ concurrency:
 
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/credit_card_manager
-  NEXTAUTH_URL: http://localhost:6014
+  NEXTAUTH_URL: http://localhost:6020
   NEXTAUTH_SECRET: ci-only-secret-not-for-real-data
   ENABLE_DEMO_AUTH: "true"
   NEXT_PUBLIC_ENABLE_DEMO_AUTH: "true"

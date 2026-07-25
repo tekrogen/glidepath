@@ -22,7 +22,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['html']] : 'html',
 
   use: {
-    baseURL: process.env.TEST_BASE_URL || 'http://localhost:6014',
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:6020',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -78,13 +78,13 @@ export default defineConfig({
 
   webServer: {
     command: 'pnpm db:generate && pnpm db:push && pnpm db:seed && pnpm dev',
-    url: process.env.TEST_BASE_URL || 'http://localhost:6014',
+    url: process.env.TEST_BASE_URL || 'http://localhost:6020',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
     env: {
       ENABLE_DEMO_AUTH: 'true',
       NEXT_PUBLIC_ENABLE_DEMO_AUTH: 'true',
-      NEXTAUTH_URL: 'http://localhost:6014',
+      NEXTAUTH_URL: 'http://localhost:6020',
       // Must match payment-reminders.spec.ts (intent-expiry cron e2e).
       CRON_SECRET: 'e2e-cron-secret',
     },

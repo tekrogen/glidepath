@@ -51,7 +51,7 @@ pnpm db:seed                 # demo user + 9 months of data
 pnpm dev
 ```
 
-Open http://localhost:6014 and sign in with the demo account:
+Open http://localhost:6020 and sign in with the demo account:
 
 > **demo@glidepath.cards** / **demo-password**
 
@@ -80,9 +80,9 @@ Full annotated list in [.env.example](./.env.example).
 
 | Command | What it does |
 |---|---|
-| `pnpm dev` | Dev server on http://localhost:6014 |
-| `pnpm dev:https` | Dev server with self-signed HTTPS (https://localhost:6014) |
-| `pnpm build` / `pnpm start` | Production build / serve (port 6014) |
+| `pnpm dev` | Dev server on http://localhost:6020 |
+| `pnpm dev:https` | Dev server with self-signed HTTPS (https://localhost:6020) |
+| `pnpm build` / `pnpm start` | Production build / serve (port 6020) |
 | `pnpm typecheck` / `pnpm lint` | TypeScript / ESLint |
 | `pnpm db:push` | Sync Prisma schema (dev) |
 | `pnpm db:migrate` | Create a migration (production workflow) |

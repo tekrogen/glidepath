@@ -89,8 +89,8 @@ Project-specific conventions and gotchas. The behavioral guidelines above still 
 
 ### Running the app
 
-- Dev server runs on **port 6014** (`pnpm dev`, `pnpm dev:https`, `pnpm start` all pin it). If Next reports "Port 6014 is in use" and falls back to another port, a stale server is running — kill it; auth breaks on the fallback port because `NEXTAUTH_URL` is port-specific.
-- `pnpm dev:https` auto-generates certificates into `certificates/` (gitignored) via Next's `--experimental-https`. When using HTTPS regularly, set `NEXTAUTH_URL=https://localhost:6014`; keep `http://` for plain `pnpm dev`.
+- Dev server runs on **port 6020** (`pnpm dev`, `pnpm dev:https`, `pnpm start` all pin it). If Next reports "Port 6020 is in use" and falls back to another port, a stale server is running — kill it; auth breaks on the fallback port because `NEXTAUTH_URL` is port-specific.
+- `pnpm dev:https` auto-generates certificates into `certificates/` (gitignored) via Next's `--experimental-https`. When using HTTPS regularly, set `NEXTAUTH_URL=https://localhost:6020`; keep `http://` for plain `pnpm dev`.
 - **Env file is `.env`, not `.env.local`** — the Prisma CLI only loads `.env`; Next.js loads both. Everything (README, seed, scripts) assumes `.env`.
 
 ### Data conventions (load-bearing)
@@ -132,7 +132,7 @@ Project-specific conventions and gotchas. The behavioral guidelines above still 
 - **Three projects**: `setup` (demo login → `tests/.auth/user.json`), `public` (no session), `authenticated` (reuses storageState). Config: `playwright.config.ts`.
 - **`pnpm test:e2e`** seeds the DB and starts the dev server when none is running (`webServer.command`). In CI set `CI=true` for a fresh server every run.
 - **Demo auth in tests**: `webServer.env` sets `ENABLE_DEMO_AUTH=true`; do not reference Ebia's `ENABLE_TEST_AUTH` — it does not exist here.
-- **Port 6014** is hardcoded in `baseURL`, `NEXTAUTH_URL`, and dev scripts; keep them aligned.
+- **Port 6020** is hardcoded in `baseURL`, `NEXTAUTH_URL`, and dev scripts; keep them aligned.
 
 ### Releases and commits
 
