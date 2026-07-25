@@ -146,7 +146,7 @@ pnpm dev:tunnel
 ```
 
 This runs concurrently:
-- Next.js HTTPS dev server on `https://localhost:6014`
+- Next.js HTTPS dev server on `https://localhost:6020`
 - Cloudflare tunnel named `ebia` routing traffic to localhost
 
 ### Tunnel Subdomains

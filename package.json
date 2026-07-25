@@ -8,10 +8,10 @@
   },
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "next dev -p 6014",
-    "dev:https": "next dev --experimental-https -p 6014",
+    "dev": "next dev -p 6020",
+    "dev:https": "next dev --experimental-https -p 6020",
     "build": "next build",
-    "start": "next start -p 6014",
+    "start": "next start -p 6020",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",

@@ -40,7 +40,7 @@ Register the redirect URI in the Plaid dashboard under
 **Developers → API → Allowed redirect URIs**:
 
 ```
-http://localhost:6014/connect-account          # dev
+http://localhost:6020/connect-account          # dev
 https://yourdomain.com/connect-account         # production
 ```
 
@@ -53,7 +53,7 @@ Plaid pushes `TRANSACTIONS` webhooks when new data is ready. Set
 `/api/webhooks/plaid`:
 
 - **Production**: `https://yourdomain.com/api/webhooks/plaid`
-- **Local dev**: use a tunnel (`cloudflared tunnel`, `ngrok http 6014`) and use
+- **Local dev**: use a tunnel (`cloudflared tunnel`, `ngrok http 6020`) and use
   the tunnel URL.
 
 Webhook signatures are verified with Plaid's JWT verification and **fail
@@ -91,13 +91,13 @@ Sign-in buttons appear automatically when a provider's env vars are set.
 **Google** — [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
 → Create OAuth 2.0 Client ID:
 
-- Authorized redirect URI: `http://localhost:6014/api/auth/callback/google`
+- Authorized redirect URI: `http://localhost:6020/api/auth/callback/google`
 - Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 
 **GitHub** — [github.com/settings/developers](https://github.com/settings/developers)
 → New OAuth App:
 
-- Callback URL: `http://localhost:6014/api/auth/callback/github`
+- Callback URL: `http://localhost:6020/api/auth/callback/github`
 - Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
 
 To make yourself a platform admin, add your email to `ADMIN_EMAIL` before your
@@ -158,9 +158,9 @@ pnpm dev:lan
 ```
 
 It detects your LAN IP, binds the server to all interfaces, and overrides
-`NEXTAUTH_URL` to `http://<your-ip>:6014` for that run. Open the printed URL
+`NEXTAUTH_URL` to `http://<your-ip>:6020` for that run. Open the printed URL
 on your phone and sign in with the demo credentials.
 
 **Google/GitHub OAuth do not work over LAN IPs** — providers only redirect to
-hosts registered in their consoles (`http://localhost:6014` is what's
+hosts registered in their consoles (`http://localhost:6020` is what's
 registered). On a phone, use the demo credentials.

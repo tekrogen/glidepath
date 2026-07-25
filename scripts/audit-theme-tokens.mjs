@@ -25,12 +25,12 @@ const out = {}
 for (const scheme of ["light", "dark"]) {
   const ctx = await browser.newContext({ colorScheme: scheme })
   const page = await ctx.newPage()
-  await page.goto("http://localhost:6014/signin")
+  await page.goto("http://localhost:6020/signin")
   await page.getByLabel("Email").fill("demo@glidepath.cards")
   await page.getByLabel("Password").fill("demo-password")
   await page.getByRole("button", { name: "Sign in" }).click()
   await page.waitForURL(/dashboard|overview/)
-  await page.goto("http://localhost:6014/overview", { waitUntil: "networkidle" })
+  await page.goto("http://localhost:6020/overview", { waitUntil: "networkidle" })
   out[scheme] = await page.evaluate((tokens) => {
     const cs = getComputedStyle(document.documentElement)
     const r = {}
