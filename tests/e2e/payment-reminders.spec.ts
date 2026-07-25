@@ -100,12 +100,15 @@ test("due-date and planned-payment reminders land in the notification panel", as
       page.getByTestId("notification-row").filter({ hasText: "Payment due soon" }).first()
     ).toBeVisible()
   }
-  // ALWAYS asserted: the $43.00 payment this spec inserts at today+2.
+  // ALWAYS asserted: the $43.00 payment this spec inserts at today+2. Filter
+  // by title AND this spec's own amount — a seeded payment can share the
+  // same day-offset on some run dates (two "in 2 days" rows on 2026-07-25),
+  // so the title alone is not unique.
   await expect(
-    page.getByTestId("notification-row").filter({ hasText: "Planned payment in 2 days" })
-  ).toBeVisible()
-  await expect(
-    page.getByTestId("notification-row").filter({ hasText: "$43.00" })
+    page
+      .getByTestId("notification-row")
+      .filter({ hasText: "Planned payment in 2 days" })
+      .filter({ hasText: "$43.00" })
   ).toBeVisible()
 })
 
