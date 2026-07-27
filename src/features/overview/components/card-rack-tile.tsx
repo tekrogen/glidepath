@@ -4,10 +4,13 @@
  * One card-rack tile (issue #12, 0b wireframe) — the mockup tile idiom in the
  * app's own tokens: name + masked last-four, outlined StatusBadge, hero
  * balance, a utilization mini-bar, and a footer with the shared FreezeControl
- * and a disabled "Pay · Soon" affordance (no payments model exists yet). Client
- * because it hosts FreezeControl; the badge derives through the one status
- * engine (resolveStatusBadge) — never re-derived.
+ * and a "Pay" chip into /payments/new (#72 — wired once the payments phase
+ * shipped; chip idiom per the #46 AA chip contract, DS-008). Client because it
+ * hosts FreezeControl; the badge derives through the one status engine
+ * (resolveStatusBadge) — never re-derived.
  */
+import Link from "next/link"
+
 import { Card } from "@/components/ui/card"
 import { FreezeControl } from "@/features/cards/components/freeze-control"
 import { StatusBadge } from "@/features/cards/components/status-badge"
@@ -72,16 +75,15 @@ export function CardRackTile({ card }: { card: RackCardDto }) {
             minPayCents={card.minPayCents}
             hasEstimatedInputs={card.hasEstimatedInputs}
           />
-          <span
-            className="inline-flex cursor-default items-center gap-1 px-2 text-xs font-medium text-muted-foreground/50"
-            aria-disabled
-            title="Payments arrive in a later phase"
+          <Link
+            href="/payments/new"
+            className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-foreground hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            title="Schedule a payment"
+            data-testid="rack-pay-link"
           >
             Pay
-            <span className="rounded border border-border px-1 py-px text-[9px] tracking-wide text-muted-foreground/70">
-              Soon
-            </span>
-          </span>
+            <span className="sr-only"> — schedule a payment for {card.cardName}</span>
+          </Link>
         </span>
       </div>
     </Card>
