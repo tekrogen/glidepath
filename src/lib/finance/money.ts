@@ -53,6 +53,21 @@ export function parseDollarsToMinor(input: string): Minor | null {
 }
 
 /**
+ * Signed variant for machine-written exports (issue #48: Monarch writes
+ * card balances negative — "-1,511.38" → -151138n). Strips at most one
+ * leading "-" and delegates the magnitude to parseDollarsToMinor: string
+ * split, never a float; malformed grouping and >2 decimals are rejected,
+ * never reinterpreted.
+ */
+export function parseSignedDollarsToMinor(input: string): Minor | null {
+  const t = input.trim()
+  const negative = t.startsWith("-")
+  const magnitude = parseDollarsToMinor(negative ? t.slice(1) : t)
+  if (magnitude == null) return null
+  return negative ? -magnitude : magnitude
+}
+
+/**
  * Parse a user-typed percentage ("22.74") into basis points (2274).
  * At most two decimals; the sane APR window is 0–99.99% (0–9999 bps) —
  * anything outside returns null, as does the empty string.

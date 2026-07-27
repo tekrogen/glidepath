@@ -100,6 +100,25 @@ export async function setCardLifecycle(
   return { updated: result.count, cardName: card?.cardName ?? null }
 }
 
+/** The household's cards in Monarch-matcher shape (issue #48) — the ONLY
+ *  Prisma read the Monarch actions consume (arch §15: repository owns
+ *  Prisma for the cards domain). */
+export async function findMatchableCards(householdId: string) {
+  return prisma.creditCard.findMany({
+    where: { householdId },
+    select: {
+      id: true,
+      cardName: true,
+      issuer: true,
+      lastFour: true,
+      currency: true,
+      monarchAccountKey: true,
+      currentBalanceMinor: true,
+    },
+    orderBy: [{ cardName: "asc" }],
+  })
+}
+
 /** Household members for the owner picker (issue #78) — label data only. */
 export async function findHouseholdMembers(householdId: string) {
   return prisma.householdMember.findMany({

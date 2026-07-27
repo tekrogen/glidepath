@@ -92,8 +92,10 @@ test.afterAll(() => {
 
 async function uploadAndPreview(page: Page, file: string) {
   await page.goto("/cards/import")
-  await expect(page.getByRole("heading", { name: "Import your tracker" })).toBeVisible()
-  await page.getByLabel("Tracker workbook").setInputFiles(file)
+  await expect(page.getByRole("heading", { name: "Import cards" })).toBeVisible()
+  // Scoped inside the tabpanel (issue #48 added source tabs — the panel
+  // itself is aria-labelled "Tracker workbook" by its trigger).
+  await page.getByRole("tabpanel").getByLabel("Tracker workbook").setInputFiles(file)
   await page.getByRole("button", { name: "Preview import" }).click()
 }
 
@@ -101,7 +103,7 @@ test("Settings links to the import screen", async ({ page }) => {
   await page.goto("/settings")
   await page.getByRole("link", { name: "Import Cards" }).click()
   await expect(page).toHaveURL(/\/cards\/import/)
-  await expect(page.getByRole("heading", { name: "Import your tracker" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Import cards" })).toBeVisible()
 })
 
 test("preview surfaces every mapped field and warning before any write", async ({ page }) => {
@@ -206,7 +208,7 @@ test("an empty tracker and an oversized file both fail with named errors", async
   await expect(page.getByTestId("import-error")).toContainText("No cards found in rows 6–25")
 
   // Oversized is rejected client-side before any upload.
-  await page.getByLabel("Tracker workbook").setInputFiles(oversizedPath)
+  await page.getByRole("tabpanel").getByLabel("Tracker workbook").setInputFiles(oversizedPath)
   await page.getByRole("button", { name: "Preview import" }).click()
   await expect(page.getByTestId("import-error")).toContainText("too large to be a card tracker")
 })
