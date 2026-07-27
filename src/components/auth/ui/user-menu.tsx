@@ -46,7 +46,6 @@ const navIconMap: Record<string, React.ComponentType<{ className?: string }>> = 
   "/analytics": TrendingUp,
   "/budgets": PieChart,
   "/recurring": CalendarClock,
-  "/settings": Settings,
 };
 
 interface UserMenuProps {
@@ -138,7 +137,10 @@ export function UserMenu({ compact = false }: UserMenuProps) {
         <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
           Navigation
         </DropdownMenuLabel>
-        {headerNavLinks.map((link) => {
+        {/* /settings renders once, in the Preferences block below (#74). */}
+        {headerNavLinks
+          .filter((link) => link.href !== "/settings")
+          .map((link) => {
           const Icon = navIconMap[link.href] || Home;
           return (
             <DropdownMenuItem key={link.href} asChild>

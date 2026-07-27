@@ -93,4 +93,10 @@ test.describe("Shell architecture (mockup IA)", () => {
     await expect(rewards).toBeVisible()
     expect(await rewards.evaluate((el) => el.closest("a") != null)).toBe(false)
   })
+
+  test("user menu lists Settings exactly once (#74)", async ({ page }) => {
+    await page.goto("/overview")
+    await page.getByRole("button", { name: /Demo User/ }).click()
+    await expect(page.getByRole("menuitem", { name: /Settings/ })).toHaveCount(1)
+  })
 })
