@@ -35,6 +35,11 @@ test.describe("Overview page", () => {
     const viewAll = page.getByRole("link", { name: /more cards · View all 18 cards/ })
     await expect(viewAll).toBeVisible()
     await expect(viewAll).toHaveAttribute("href", "/cards")
+    // #72: the tile's Pay chip is a live link into the payments flow, not the
+    // Phase-2 disabled placeholder.
+    const payLink = page.getByTestId("rack-tile").first().getByTestId("rack-pay-link")
+    await expect(payLink).toBeVisible()
+    await expect(payLink).toHaveAttribute("href", "/payments/new")
   })
 
   test("upcoming payments: real rows, ordered, no-due-day cards excluded", async ({ page }) => {
