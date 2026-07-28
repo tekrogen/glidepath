@@ -11,6 +11,7 @@
 import type { NotificationType } from "@prisma/client"
 import type { AttentionItem } from "@/features/overview/utils/build-attention-items"
 import type { ReminderItem } from "@/features/notifications/utils/build-reminder-items"
+import type { PlaidNotificationItem } from "@/features/notifications/utils/build-plaid-items"
 
 import {
   countUnreadForUser,
@@ -45,10 +46,11 @@ export interface NotificationPanel {
 export async function syncOccurrenceNotifications(
   userId: string,
   attention: AttentionItem[],
-  reminders: ReminderItem[]
+  reminders: ReminderItem[],
+  plaid: PlaidNotificationItem[] = []
 ): Promise<void> {
   const rows = new Map<string, NotificationRow>()
-  for (const i of [...reminders, ...attention]) {
+  for (const i of [...plaid, ...reminders, ...attention]) {
     rows.set(i.dedupeKey, {
       userId,
       type: i.type as NotificationType,

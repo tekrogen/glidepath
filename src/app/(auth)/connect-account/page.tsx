@@ -209,7 +209,11 @@ function ConnectAccountContent() {
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Account balances and account details</li>
                   <li>Credit card transaction history</li>
-                  
+                  <li>
+                    Credit card terms — APRs, minimum payment, due dates, and
+                    statement balances (used to fill your cards, never to
+                    overwrite values you entered)
+                  </li>
                 </ul>
                 <p>
                   Your data is encrypted at rest and in transit. Access consent

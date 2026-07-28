@@ -12,7 +12,9 @@ import { auth } from "@/lib/auth"
 import { hasPermission } from "@/lib/auth/constants"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImportMonarchWizard } from "@/features/cards/components/import-monarch-wizard"
+import { ImportPlaidCards } from "@/features/cards/components/import-plaid-cards"
 import { ImportTrackerWizard } from "@/features/cards/components/import-tracker-wizard"
+import { getDiscoveredCardsForUser } from "@/features/cards/server/plaid-cards-service"
 
 export default async function ImportCardsPage({
   searchParams,
@@ -27,7 +29,8 @@ export default async function ImportCardsPage({
     redirect("/overview")
   }
   const { source } = await searchParams
-  const defaultTab = source === "monarch" ? "monarch" : "tracker"
+  const defaultTab = source === "monarch" ? "monarch" : source === "plaid" ? "plaid" : "tracker"
+  const discovered = await getDiscoveredCardsForUser(session.user.id)
 
   return (
     <div className="space-y-6">
@@ -46,12 +49,16 @@ export default async function ImportCardsPage({
         <TabsList>
           <TabsTrigger value="tracker">Tracker workbook</TabsTrigger>
           <TabsTrigger value="monarch">Monarch balances</TabsTrigger>
+          <TabsTrigger value="plaid">Connected banks</TabsTrigger>
         </TabsList>
         <TabsContent value="tracker" className="mt-4">
           <ImportTrackerWizard />
         </TabsContent>
         <TabsContent value="monarch" className="mt-4">
           <ImportMonarchWizard />
+        </TabsContent>
+        <TabsContent value="plaid" className="mt-4">
+          <ImportPlaidCards candidates={discovered} />
         </TabsContent>
       </Tabs>
     </div>

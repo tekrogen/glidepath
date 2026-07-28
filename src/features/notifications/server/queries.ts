@@ -13,16 +13,27 @@ import { getPortfolioForUser } from "@/features/cards"
 import { buildAttentionItems } from "@/features/overview"
 import { getRunwayForUser } from "@/features/payments"
 import { buildReminderItems } from "@/features/notifications/utils/build-reminder-items"
+import { buildPlaidItems } from "@/features/notifications/utils/build-plaid-items"
+// Service-module import (issue #109): the plaid DTOs are read-only inputs to
+// the occurrence union — every source must be included on every panel read
+// or its rows are wiped by the current-set reconcile.
+import {
+  getDiscoveredCardsForUser,
+  getPendingSuggestionsForUser,
+} from "@/features/cards/server/plaid-cards-service"
 
 import { getNotificationPanel, syncOccurrenceNotifications } from "./service"
 
 export const getNotificationPanelForUser = cache(async (userId: string) => {
-  const [{ cards, asOf }, runway] = await Promise.all([
+  const [{ cards, asOf }, runway, discovered, suggestions] = await Promise.all([
     getPortfolioForUser(userId),
     getRunwayForUser(userId),
+    getDiscoveredCardsForUser(userId),
+    getPendingSuggestionsForUser(userId),
   ])
   const attention = buildAttentionItems(cards, asOf)
   const reminders = buildReminderItems(runway.cards, runway.payments, asOf)
-  await syncOccurrenceNotifications(userId, attention, reminders)
+  const plaid = buildPlaidItems(discovered, suggestions)
+  await syncOccurrenceNotifications(userId, attention, reminders, plaid)
   return getNotificationPanel(userId)
 })

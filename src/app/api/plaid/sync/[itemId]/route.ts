@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth/guards';
 import {
+  sanitizePlaidError,
   syncAccounts,
   syncTransactions,
   updateItemWebhook,
 } from '@/lib/services/plaid-service';
 import { prisma } from '@/lib/db/prisma';
+import { syncLiabilitiesForItem } from '@/features/cards/server/liabilities-sync';
 
 export async function POST(
   _request: Request,
@@ -40,12 +42,29 @@ export async function POST(
     // Sync transactions
     const txnResult = await syncTransactions(itemId);
 
+    // Liabilities → linked cards (issue #109). Best-effort: a liabilities
+    // failure sweeps those cards to SYNC_FAILED (inside the sync) without
+    // failing the accounts/transactions refresh above.
+    let liabilitiesCardsUpdated: number | null = null;
+    try {
+      const liabilities = await syncLiabilitiesForItem(itemId, {
+        userId: guard.session.user.id,
+      });
+      liabilitiesCardsUpdated = liabilities.cardsUpdated;
+    } catch (liabilitiesError) {
+      console.error(
+        'Liabilities sync failed (non-blocking):',
+        sanitizePlaidError(liabilitiesError)
+      );
+    }
+
     return NextResponse.json({
       success: true,
       accountsUpdated: accountResult.accountsUpdated,
       transactionsAdded: txnResult.added,
       transactionsModified: txnResult.modified,
       transactionsRemoved: txnResult.removed,
+      liabilitiesCardsUpdated,
     });
   } catch (error) {
     console.error('Failed to sync:', error);

@@ -19,6 +19,9 @@ const AUDIT_ACTIONS: Record<DomainEvent["type"], string> = {
   PaymentRescheduled: "PAYMENT_RESCHEDULED",
   PaymentScheduled: "PAYMENT_SCHEDULED",
   PaymentIntentExpired: "PAYMENT_INTENT_EXPIRED",
+  PlaidCardsLinked: "PLAID_CARDS_LINKED",
+  PlaidLiabilitiesSynced: "PLAID_LIABILITIES_SYNCED",
+  CardSuggestionResolved: "CARD_SUGGESTION_RESOLVED",
 }
 
 const PAYMENT_EVENTS: ReadonlySet<DomainEvent["type"]> = new Set([
@@ -76,6 +79,32 @@ function auditDetails(event: DomainEvent): string {
       householdId: event.householdId,
       intentId: event.intentId,
       expiredAt: event.expiredAt,
+    })
+  }
+  if (event.type === "PlaidCardsLinked") {
+    return JSON.stringify({
+      householdId: event.householdId,
+      plaidItemId: event.plaidItemId,
+      institutionName: event.institutionName,
+      cardIds: event.cardIds,
+      cardNames: event.cardNames,
+    })
+  }
+  if (event.type === "PlaidLiabilitiesSynced") {
+    return JSON.stringify({
+      householdId: event.householdId,
+      plaidItemId: event.plaidItemId,
+      cardsUpdated: event.cardsUpdated,
+      suggestionsCreated: event.suggestionsCreated,
+    })
+  }
+  if (event.type === "CardSuggestionResolved") {
+    return JSON.stringify({
+      cardId: event.cardId,
+      cardName: event.cardName,
+      householdId: event.householdId,
+      field: event.field,
+      resolution: event.resolution,
     })
   }
   if (event.type === "CardUpdated") {
