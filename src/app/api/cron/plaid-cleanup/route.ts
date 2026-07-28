@@ -14,8 +14,10 @@ import { decrypt } from '@/lib/utils/encryption';
  *
  * Schedule suggestion: daily at 6 AM UTC
  * vercel.json: { "path": "/api/cron/plaid-cleanup", "schedule": "0 6 * * *" }
+ * Vercel Cron invokes with GET (issue #66); external schedulers may POST —
+ * both are exported over the same handler, same idiom as intent-expiry.
  */
-export async function POST(request: Request) {
+async function handle(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
@@ -112,3 +114,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export { handle as GET, handle as POST };
