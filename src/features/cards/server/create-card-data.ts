@@ -38,6 +38,7 @@ export interface CreateCardData {
   limitSource: "MANUAL" | "UNKNOWN"
   aprSource: "MANUAL" | "UNKNOWN"
   minimumSource: "MANUAL" | "UNKNOWN"
+  dueDaySource: "MANUAL" | "UNKNOWN"
   promo: {
     endsOn: Date
     regularAprBpsAfter: number | null
@@ -67,6 +68,10 @@ export function toCreateCardData(input: CreateCardInput): CreateCardData {
     limitSource: input.creditLimitMinor != null ? "MANUAL" : "UNKNOWN",
     aprSource: input.regularAprBps != null || promoActive ? "MANUAL" : "UNKNOWN",
     minimumSource: input.minimumPaymentMinor != null ? "MANUAL" : "UNKNOWN",
+    // Same presence rule as the three above — without it, an edited due day
+    // on a PLAID-stamped card would be silently reverted by the next sync
+    // (review finding, issue #109).
+    dueDaySource: input.paymentDueDay != null ? "MANUAL" : "UNKNOWN",
     promo: promoActive
       ? {
           endsOn: input.promoEndsOn!,

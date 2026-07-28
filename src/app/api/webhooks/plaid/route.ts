@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db/prisma';
-import { handlePlaidWebhook } from '@/lib/services/plaid-service';
+import { handlePlaidWebhook, sanitizePlaidError } from '@/lib/services/plaid-service';
 import { verifyPlaidWebhook } from '@/lib/services/plaid-webhook-verifier';
 import { syncLiabilitiesForItem } from '@/features/cards/server/liabilities-sync';
 
@@ -102,7 +102,9 @@ export async function POST(request: Request) {
     const { action, result } = await handlePlaidWebhook(webhook_type, webhook_code, item_id);
     return NextResponse.json({ received: true, action, result });
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    // Sanitize before logging — a raw Plaid/Axios error serializes the
+    // request body, which carries client_id/secret/access tokens.
+    console.error('Webhook processing error:', sanitizePlaidError(error));
 
     // Log processing failure
     await prisma.auditLog.create({
@@ -112,7 +114,7 @@ export async function POST(request: Request) {
         details: JSON.stringify({
           webhookType: webhook_type,
           webhookCode: webhook_code,
-          error: error instanceof Error ? error.message : 'unknown',
+          error: sanitizePlaidError(error),
         }),
         success: false,
       },

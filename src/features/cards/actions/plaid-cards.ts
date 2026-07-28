@@ -62,15 +62,20 @@ async function resolve(
   if (typeof suggestionId !== "string" || !suggestionId) {
     return { status: "error", message: "Missing suggestion." }
   }
-  const outcome = await resolveSuggestionForUser(session.user.id, suggestionId, resolution)
-  if (outcome === "not-found") {
-    // Already resolved elsewhere or foreign — refresh clears the row either way.
+  try {
+    const outcome = await resolveSuggestionForUser(session.user.id, suggestionId, resolution)
+    if (outcome === "not-found") {
+      // Already resolved elsewhere or foreign — refresh clears the row either way.
+      revalidatePath("/cards")
+      return { status: "error", message: "That suggestion is no longer open." }
+    }
     revalidatePath("/cards")
-    return { status: "error", message: "That suggestion is no longer open." }
+    revalidatePath("/overview")
+    return { status: "done" }
+  } catch (error) {
+    console.error("Suggestion resolution failed:", error)
+    return { status: "error", message: "Could not update the card. Please try again." }
   }
-  revalidatePath("/cards")
-  revalidatePath("/overview")
-  return { status: "done" }
 }
 
 export async function acceptSuggestion(

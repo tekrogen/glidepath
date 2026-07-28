@@ -149,6 +149,13 @@ export interface LiabilityApplyPlan {
     dueDaySource?: "PLAID"
   }
   suggestions: SuggestionInput[]
+  /**
+   * Gated fields the provider actually reported this sync (set, skipped, or
+   * suggested). A PENDING suggestion for an evaluated field that produced no
+   * suggestion means the divergence cleared — the commit closes it. Fields
+   * the provider omitted are NOT evaluated (unknown ≠ resolved).
+   */
+  evaluated: SuggestedFieldKey[]
   warnings: string[]
 }
 
@@ -194,11 +201,12 @@ export function planLiabilityApply(
     warnings.push(
       `provider currency ${normalized.isoCurrencyCode} ≠ card currency ${card.currency} — nothing applied`
     )
-    return { sets: {}, suggestions: [], warnings }
+    return { sets: {}, suggestions: [], evaluated: [], warnings }
   }
 
   const sets: LiabilityApplyPlan["sets"] = {}
   const suggestions: SuggestionInput[] = []
+  const evaluated: SuggestedFieldKey[] = []
 
   // Balances are provider-owned — always refreshed, no provenance gate.
   if (normalized.currentBalanceMinor !== null) {
@@ -209,6 +217,7 @@ export function planLiabilityApply(
   }
 
   if (normalized.creditLimitMinor !== null) {
+    evaluated.push("CREDIT_LIMIT_MINOR")
     const outcome = gate(
       card.limitSource,
       card.creditLimitMinor === null ? null : card.creditLimitMinor.toString(),
@@ -233,6 +242,7 @@ export function planLiabilityApply(
       // never written, never suggested.
       warnings.push("active promo — provider APR not applied")
     } else {
+      evaluated.push("REGULAR_APR_BPS")
       const outcome = gate(
         card.aprSource,
         card.regularAprBps === null ? null : String(card.regularAprBps),
@@ -252,6 +262,7 @@ export function planLiabilityApply(
   }
 
   if (normalized.minimumPaymentMinor !== null) {
+    evaluated.push("MINIMUM_PAYMENT_MINOR")
     const outcome = gate(
       card.minimumSource,
       card.minimumPaymentMinor === null ? null : card.minimumPaymentMinor.toString(),
@@ -270,6 +281,7 @@ export function planLiabilityApply(
   }
 
   if (normalized.paymentDueDay !== null) {
+    evaluated.push("PAYMENT_DUE_DAY")
     const outcome = gate(
       card.dueDaySource,
       card.paymentDueDay === null ? null : String(card.paymentDueDay),
@@ -287,5 +299,5 @@ export function planLiabilityApply(
     }
   }
 
-  return { sets, suggestions, warnings }
+  return { sets, suggestions, evaluated, warnings }
 }

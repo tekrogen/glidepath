@@ -349,10 +349,17 @@ export async function createDiscoveredCards(
         },
         select: { id: true, cardName: true },
       })
-      await tx.plaidAccount.update({
-        where: { id: link.id },
+      // Atomic claim (review finding): the WHERE re-asserts creditCardId null
+      // so a concurrent import that won the race matches zero rows — this
+      // card create is then undone instead of surviving as an orphan.
+      const claimed = await tx.plaidAccount.updateMany({
+        where: { id: link.id, creditCardId: null },
         data: { creditCardId: row.id },
       })
+      if (claimed.count === 0) {
+        await tx.creditCard.delete({ where: { id: row.id } })
+        continue
+      }
       created.push({ cardId: row.id, cardName: row.cardName, plaidItemId: link.plaidItemId })
     }
     return created
@@ -438,6 +445,21 @@ export async function applyLiabilityPlan(
       }
       // Same proposal already ACCEPTED/DISMISSED — pinned, nothing to do.
     }
+    // Close PENDING suggestions whose divergence has cleared (review
+    // finding): the provider reported the field this sync (evaluated) yet no
+    // suggestion resulted — the user now agrees with the provider or cleared
+    // the field. Unreported fields stay untouched (unknown ≠ resolved).
+    const stillOpen = new Set(plan.suggestions.map((s) => s.field))
+    const clearedFields = plan.evaluated.filter((f) => !stillOpen.has(f))
+    if (clearedFields.length > 0) {
+      await tx.cardProviderSuggestion.deleteMany({
+        where: {
+          cardId,
+          status: "PENDING",
+          field: { in: clearedFields as SuggestedCardField[] },
+        },
+      })
+    }
     return { suggestionsOpened }
   })
 }
@@ -508,6 +530,18 @@ export async function resolveSuggestion(
     })
     if (!suggestion) return null
     if (resolution === "accepted") {
+      // A promo added since the suggestion opened makes an APR acceptance
+      // stale: card-level APR must stay null while a promo shelters the
+      // balance (review finding). Close the row and report not-open.
+      if (suggestion.field === "REGULAR_APR_BPS") {
+        const activePromos = await tx.promoPeriod.count({
+          where: { cardId: suggestion.card.id, status: "ACTIVE" },
+        })
+        if (activePromos > 0) {
+          await tx.cardProviderSuggestion.delete({ where: { id: suggestion.id } })
+          return null
+        }
+      }
       await tx.creditCard.updateMany({
         where: { id: suggestion.card.id, householdId },
         data: suggestionApplyData(suggestion.field, suggestion.proposedValue),

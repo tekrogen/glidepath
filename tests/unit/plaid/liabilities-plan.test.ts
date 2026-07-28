@@ -183,6 +183,12 @@ describe("planLiabilityApply — truth-ownership gates", () => {
       dueDaySource: "PLAID",
     })
     expect(plan.suggestions).toEqual([])
+    expect(plan.evaluated).toEqual([
+      "CREDIT_LIMIT_MINOR",
+      "REGULAR_APR_BPS",
+      "MINIMUM_PAYMENT_MINOR",
+      "PAYMENT_DUE_DAY",
+    ])
   })
 
   it("the Blueprint row: manual APR 25.5% vs Plaid 24.99% → suggestion, no write", () => {
@@ -234,12 +240,16 @@ describe("planLiabilityApply — truth-ownership gates", () => {
     expect(plan.suggestions.find((s) => s.field === "REGULAR_APR_BPS")).toBeUndefined()
     expect(plan.sets.minimumPaymentMinor).toBe(4000n)
     expect(plan.warnings).toContain("active promo — provider APR not applied")
+    // Promo-skipped APR is NOT evaluated — an open APR suggestion must not
+    // be auto-closed by a sync that deliberately ignored the field.
+    expect(plan.evaluated).not.toContain("REGULAR_APR_BPS")
   })
 
   it("currency mismatch aborts the entire plan", () => {
     const plan = planLiabilityApply(card({ currency: "CAD" }), full())
     expect(plan.sets).toEqual({})
     expect(plan.suggestions).toEqual([])
+    expect(plan.evaluated).toEqual([])
     expect(plan.warnings.at(-1)).toMatch(/USD ≠ card currency CAD/)
   })
 
