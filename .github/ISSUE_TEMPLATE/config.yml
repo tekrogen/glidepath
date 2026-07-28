@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup & troubleshooting
+    url: https://github.com/tekrogen/glidepath#quick-start
+    about: Read the README quick start and SETUP.md before filing an environment problem.
+  - name: Branch & PR workflow
+    url: https://github.com/tekrogen/glidepath/blob/main/BRANCH-WORKFLOWS.md
+    about: Every code change lands as issue -> branch -> PR (Closes #N) -> CI green -> squash-merge.
