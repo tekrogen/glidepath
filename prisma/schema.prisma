@@ -89,6 +89,7 @@ model UserAccount {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
   creditCards  CreditCard[]
+  plaidAccount PlaidAccount?
 
   @@index([userId])
 }
@@ -278,7 +279,30 @@ model PlaidItem {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  accounts PlaidAccount[]
+
   @@index([userId])
+}
+
+// Identity spine for Plaid-linked accounts: one row per Plaid account, keyed
+// by Plaid's stable account_id. All sync/cleanup account resolution goes
+// through this table — NEVER by mask/last-four (duplicates exist; issue #107).
+// Later epics (Liabilities, Statements) will hang the CreditCard FK here.
+model PlaidAccount {
+  id            String  @id @default(cuid())
+  plaidItemId   String
+  accountId     String  @unique // Plaid account_id — the only matching key
+  userAccountId String? @unique // linked local ledger account
+  mask          String? // display only; never used for matching
+  name          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plaidItem   PlaidItem    @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  userAccount UserAccount? @relation(fields: [userAccountId], references: [id], onDelete: SetNull)
+
+  @@index([plaidItemId])
 }
 
 // Enums

@@ -7,6 +7,7 @@ import {
 import { prisma } from '@/lib/db/prisma';
 import { encrypt, decrypt } from '@/lib/utils/encryption';
 import { mapPlaidAccount, mapPlaidTransaction } from './plaid-transaction-mapper';
+import { formatPlaidMask, planAccountLinks } from './plaid-account-matching';
 import { parseProducts } from './plaid-products';
 import { initializeCategories } from '@/lib/categories-init';
 import type { AccountType, Prisma } from '@prisma/client';
@@ -275,45 +276,126 @@ export async function syncAccounts(plaidItemId: string): Promise<{
   });
 
   const { accounts } = response.data;
+
+  // Resolve every Plaid account through the PlaidAccount spine (account_id is
+  // the only matching key — issue #107). The planner is pure; execute it here.
+  const links = await prisma.plaidAccount.findMany({
+    where: { plaidItemId },
+    select: { accountId: true, userAccountId: true },
+  });
+  const locals = await prisma.userAccount.findMany({
+    where: { userId: plaidItem.userId },
+    select: { id: true, accountNumber: true, plaidAccount: { select: { id: true } } },
+  });
+
+  const actions = planAccountLinks(
+    accounts.map((a) => ({ accountId: a.account_id, mask: formatPlaidMask(a) })),
+    links,
+    locals.map((l) => ({
+      id: l.id,
+      accountNumber: l.accountNumber,
+      claimed: l.plaidAccount !== null,
+    }))
+  );
+
+  const byAccountId = new Map(accounts.map((a) => [a.account_id, a]));
   let accountsUpdated = 0;
 
-  for (const plaidAccount of accounts) {
+  for (const action of actions) {
+    const plaidAccount = byAccountId.get(action.accountId);
+    if (!plaidAccount) continue;
     const mapped = mapPlaidAccount(plaidAccount, plaidItem.institutionName);
+    const data = {
+      name: mapped.name,
+      type: mapped.type as AccountType,
+      balance: mapped.balance,
+      institution: plaidItem.institutionName || 'Connected Account',
+    };
+    const linkMeta = {
+      mask: plaidAccount.mask ?? null,
+      name: plaidAccount.name ?? null,
+    };
 
-    // Find existing account by userId + accountNumber
-    const existing = await prisma.userAccount.findFirst({
-      where: {
-        userId: plaidItem.userId,
-        accountNumber: mapped.accountNumber,
-      },
-    });
+    if (action.kind === 'update') {
+      await prisma.userAccount.update({ where: { id: action.userAccountId }, data });
+      await prisma.plaidAccount.update({
+        where: { accountId: action.accountId },
+        data: linkMeta,
+      });
+      accountsUpdated++;
+      continue;
+    }
 
-    if (existing) {
-      await prisma.userAccount.update({
-        where: { id: existing.id },
-        data: {
-          name: mapped.name,
-          type: mapped.type as AccountType,
-          balance: mapped.balance,
-          institution: plaidItem.institutionName || 'Connected Account',
-        },
+    // 'adopt'/'create' can race a concurrent syncAccounts — this function
+    // holds no lock, and the linking flow legitimately runs it twice (inline
+    // exchange sync vs the INITIAL_UPDATE webhook's backfill). The spine's
+    // unique constraints are the arbiter: the link row is claimed in the same
+    // transaction that writes the local account, so a lost race rolls the
+    // account back instead of orphaning a duplicate.
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (action.kind === 'adopt') {
+          await tx.userAccount.update({ where: { id: action.userAccountId }, data });
+          await tx.plaidAccount.create({
+            data: {
+              plaidItemId,
+              accountId: action.accountId,
+              userAccountId: action.userAccountId,
+              ...linkMeta,
+            },
+          });
+        } else {
+          const created = await tx.userAccount.create({
+            data: {
+              userId: plaidItem.userId,
+              ...data,
+              accountNumber: mapped.accountNumber,
+            },
+          });
+          // A severed link (userAccountId null) may already hold this
+          // accountId — reclaim it; otherwise create the link.
+          const reclaimed = await tx.plaidAccount.updateMany({
+            where: { accountId: action.accountId, userAccountId: null },
+            data: { userAccountId: created.id, ...linkMeta },
+          });
+          if (reclaimed.count === 0) {
+            await tx.plaidAccount.create({
+              data: {
+                plaidItemId,
+                accountId: action.accountId,
+                userAccountId: created.id,
+                ...linkMeta,
+              },
+            });
+          }
+        }
       });
-    } else {
-      await prisma.userAccount.create({
-        data: {
-          userId: plaidItem.userId,
-          name: mapped.name,
-          type: mapped.type as AccountType,
-          balance: mapped.balance,
-          institution: plaidItem.institutionName || 'Connected Account',
-          accountNumber: mapped.accountNumber,
-        },
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Lost the race: another sync claimed this accountId (or the adoption
+      // target). Write through the winner's link when it exists; otherwise
+      // skip — the next sync replans against the settled spine.
+      const link = await prisma.plaidAccount.findUnique({
+        where: { accountId: action.accountId },
+        select: { userAccountId: true },
       });
+      if (link?.userAccountId) {
+        await prisma.userAccount.update({ where: { id: link.userAccountId }, data });
+      }
     }
     accountsUpdated++;
   }
 
   return { accountsUpdated };
+}
+
+/** Prisma P2002: unique-constraint violation — the race arbiter in syncAccounts. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
 }
 
 // ─── Sync Transactions (Cursor-Based) ───────────────────────────────
@@ -381,30 +463,21 @@ async function runTransactionSync(
   const accessToken = decrypt(plaidItem.accessToken);
   const batchId = `plaid_sync_${plaidItemId}_${Date.now()}`;
 
-  // Build account lookup: Plaid account_id → our UserAccount.id
-  const userAccounts = await prisma.userAccount.findMany({
-    where: { userId: plaidItem.userId },
-    select: { id: true, accountNumber: true },
-  });
-
-  // We also need the Plaid accounts to map account_id → mask
-  const plaidAccountsResponse = await client.accountsGet({
-    ...plaidCredentials(),
-    access_token: accessToken,
-  });
-  const plaidAccountIdToMask = new Map<string, string>();
-  for (const acct of plaidAccountsResponse.data.accounts) {
-    const mask = acct.mask ? `...${acct.mask}` : `...${acct.account_id.slice(-4)}`;
-    plaidAccountIdToMask.set(acct.account_id, mask);
+  // Resolve Plaid account_id → local account through the PlaidAccount spine.
+  // Items linked before the spine existed have no rows yet — run an account
+  // sync once to establish them (adoption backfill happens there).
+  const linkSelect = {
+    where: { plaidItemId, userAccountId: { not: null } },
+    select: { accountId: true, userAccountId: true },
+  } as const;
+  let links = await prisma.plaidAccount.findMany(linkSelect);
+  if (links.length === 0) {
+    await syncAccounts(plaidItemId);
+    links = await prisma.plaidAccount.findMany(linkSelect);
   }
-
-  // Map mask → our UserAccount.id
-  const maskToAccountId = new Map<string, string>();
-  for (const ua of userAccounts) {
-    if (ua.accountNumber) {
-      maskToAccountId.set(ua.accountNumber, ua.id);
-    }
-  }
+  const accountIdToLocal = new Map(
+    links.map((l) => [l.accountId, l.userAccountId as string])
+  );
 
   let cursor = plaidItem.cursor || undefined;
   let totalAdded = 0;
@@ -423,8 +496,7 @@ async function runTransactionSync(
 
     // Process added transactions
     for (const txn of added) {
-      const mask = plaidAccountIdToMask.get(txn.account_id);
-      const accountId = mask ? maskToAccountId.get(mask) : undefined;
+      const accountId = accountIdToLocal.get(txn.account_id);
       if (!accountId) {
         continue;
       }
@@ -587,27 +659,16 @@ export async function deletePlaidItem(
     throw new Error('PlaidItem not found or access denied');
   }
 
-  // Identify which local accounts came from this Plaid connection
-  // by fetching account masks from Plaid before revoking access
-  const accountMasks: string[] = [];
-  const accessToken = decrypt(plaidItem.accessToken);
-
+  // Establish/refresh spine links so cleanup is account_id-driven even for
+  // items linked before the spine existed (best-effort; needs a live token).
   try {
-    const client = getPlaidClient();
-    const response = await client.accountsGet({
-      ...plaidCredentials(),
-      access_token: accessToken,
-    });
-
-    for (const acct of response.data.accounts) {
-      const mask = acct.mask ? `...${acct.mask}` : `...${acct.account_id.slice(-4)}`;
-      accountMasks.push(mask);
-    }
+    await syncAccounts(plaidItemId);
   } catch {
     // Plaid unreachable — fall back to institution-based cleanup below
   }
 
-  // Revoke access at Plaid (independent of accountsGet success)
+  // Revoke access at Plaid (independent of link refresh success)
+  const accessToken = decrypt(plaidItem.accessToken);
   try {
     const client = getPlaidClient();
     await client.itemRemove({
@@ -618,18 +679,24 @@ export async function deletePlaidItem(
     // Token may already be invalid or revoked — continue cleanup
   }
 
-  // Delete local accounts (and their child records via cascade) that match
-  if (accountMasks.length > 0) {
+  // Delete linked local accounts (and their child records via cascade)
+  const links = await prisma.plaidAccount.findMany({
+    where: { plaidItemId, userAccountId: { not: null } },
+    select: { userAccountId: true },
+  });
+
+  if (links.length > 0) {
     await prisma.userAccount.deleteMany({
       where: {
         userId,
-        accountNumber: { in: accountMasks },
+        id: { in: links.map((l) => l.userAccountId as string) },
       },
     });
   } else if (plaidItem.institutionName) {
-    // Fallback: Plaid was unreachable so we couldn't get account masks.
-    // Clean up local accounts by institution name, but only if this is
-    // the user's only PlaidItem for this institution (avoid cross-contamination).
+    // Fallback: no spine links could be established (Plaid unreachable on a
+    // pre-spine item). Clean up local accounts by institution name, but only
+    // if this is the user's only PlaidItem for this institution
+    // (avoid cross-contamination).
     const sameInstitutionCount = await prisma.plaidItem.count({
       where: {
         userId,
@@ -658,7 +725,7 @@ export async function deletePlaidItem(
       resource: `PlaidItem:${plaidItemId}`,
       details: JSON.stringify({
         institutionName: plaidItem.institutionName,
-        accountsCleaned: accountMasks.length,
+        accountsCleaned: links.length,
       }),
       success: true,
     },
