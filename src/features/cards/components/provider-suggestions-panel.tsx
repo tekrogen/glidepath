@@ -26,7 +26,7 @@ const FIELD_LABELS: Record<SuggestionDTO["field"], string> = {
   REGULAR_APR_BPS: "APR",
   CREDIT_LIMIT_MINOR: "credit limit",
   MINIMUM_PAYMENT_MINOR: "minimum payment",
-  PAYMENT_DUE_DAY: "payment due day",
+  PAYMENT_DUE_DAY: "payment due",
 }
 
 function formatValue(field: SuggestionDTO["field"], value: string | null): string {
