@@ -100,3 +100,31 @@ export type DomainEvent =
       /** ISO timestamp the draft expired at. */
       expiredAt: string
     }
+  | {
+      type: "PlaidCardsLinked"
+      userId: string
+      householdId: string
+      plaidItemId: string
+      institutionName: string | null
+      cardIds: string[]
+      cardNames: string[]
+    }
+  | {
+      type: "PlaidLiabilitiesSynced"
+      /** The linking user (webhook syncs act on the item owner's behalf). */
+      userId: string
+      householdId: string
+      plaidItemId: string
+      cardsUpdated: number
+      suggestionsCreated: number
+    }
+  | {
+      type: "CardSuggestionResolved"
+      userId: string
+      householdId: string
+      cardId: string
+      cardName: string
+      /** SuggestedCardField name — the audit's what, values live on the row. */
+      field: string
+      resolution: "accepted" | "dismissed"
+    }

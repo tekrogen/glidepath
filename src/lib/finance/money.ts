@@ -79,3 +79,16 @@ export function percentToBps(input: string): AprBps | null {
   const bps = Number(whole) * 100 + Number(frac.padEnd(2, "0") || "0")
   return bps > 9999 ? null : bps
 }
+
+/**
+ * Convert a numeric percentage (Plaid Liabilities `apr_percentage`: 22.74)
+ * into basis points (2274). The numeric sibling of percentToBps for
+ * machine-sourced floats (issue #109) — user-typed strings must keep going
+ * through the rejecting string parser. Same sane APR window (0–99.99%);
+ * outside it, or non-finite, returns null.
+ */
+export function percentNumberToBps(pct: number): AprBps | null {
+  if (!Number.isFinite(pct) || pct < 0) return null
+  const bps = Math.round(pct * 100)
+  return bps > 9999 ? null : bps
+}

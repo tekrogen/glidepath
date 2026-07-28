@@ -11,6 +11,8 @@ import { formatAprBps, formatStampDate, toDollarInput, toPercentInput } from "@/
 import { getMembersForUser, getPortfolioForUser } from "@/features/cards"
 import { CardsEmptyState } from "@/features/cards/components/cards-empty-state"
 import { CardsTable, type CardsTableRow } from "@/features/cards/components/cards-table"
+import { ProviderSuggestionsPanel } from "@/features/cards/components/provider-suggestions-panel"
+import { getPendingSuggestionsForUser } from "@/features/cards/server/plaid-cards-service"
 
 export const dynamic = "force-dynamic"
 
@@ -20,9 +22,10 @@ export default async function CardsPage() {
     redirect("/signin?callbackUrl=/cards")
   }
 
-  const [{ cards }, members] = await Promise.all([
+  const [{ cards }, members, suggestions] = await Promise.all([
     getPortfolioForUser(session.user.id),
     getMembersForUser(session.user.id),
+    getPendingSuggestionsForUser(session.user.id),
   ])
   const today = new Date()
 
@@ -96,6 +99,7 @@ export default async function CardsPage() {
           {formatStampDate(new Date())} · Manual
         </p>
       </div>
+      <ProviderSuggestionsPanel suggestions={suggestions} />
       {rows.length === 0 ? <CardsEmptyState /> : <CardsTable rows={rows} members={members} />}
     </div>
   )

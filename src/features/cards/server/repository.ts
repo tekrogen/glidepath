@@ -4,6 +4,8 @@
  * membership (EDR-014): a user sees the cards of households where a
  * HouseholdMember row carries their userId.
  */
+import type { SuggestedCardField } from "@prisma/client"
+
 import { prisma } from "@/lib/db/prisma"
 
 import {
@@ -11,6 +13,7 @@ import {
   type CreateCardData,
   type UpdateCardData,
 } from "./create-card-data"
+import type { LiabilityApplyPlan } from "./liabilities-plan"
 
 export type CardRow = NonNullable<Awaited<ReturnType<typeof findHouseholdCards>>>[number]
 
@@ -269,6 +272,292 @@ export async function deleteCardWithDependents(
       removedScheduledPayments: payments.count,
       removedStatements: statements.count,
       removedAutopayLink: autopay.count > 0,
+    }
+  })
+}
+
+// ─── Plaid Liabilities epic (issue #109) ──────────────────────────────
+// The PlaidAccount spine (#107) is the only join surface between Plaid and
+// the card domain — accountId/creditCardId keys, never masks. These reads
+// authorize through plaidItem.userId (the linking user), the writes through
+// householdId like every other card mutation.
+
+/** Credit-subtype Plaid accounts not yet imported as cards — the discovery list. */
+export async function findDiscoveredCreditAccounts(userId: string) {
+  return prisma.plaidAccount.findMany({
+    where: {
+      creditCardId: null,
+      plaidItem: { userId, status: "ACTIVE" },
+      userAccount: { type: "CREDIT" },
+    },
+    select: {
+      id: true,
+      mask: true,
+      name: true,
+      plaidItem: { select: { id: true, institutionName: true } },
+      userAccount: { select: { name: true, balance: true, currency: true } },
+    },
+    orderBy: [{ createdAt: "asc" }],
+  })
+}
+
+export interface DiscoveredCardCreate {
+  plaidAccountId: string
+  cardName: string
+  issuer: string
+  issuerKey: string | null
+  lastFour: string | null
+  currency: string
+  currentBalanceMinor: bigint
+}
+
+/**
+ * Import confirmed discovered accounts as cards: one transaction creates each
+ * card (syncStatus SYNC_PENDING — the honest post-link state, filled by the
+ * liabilities sync that follows) and claims its PlaidAccount link. The
+ * per-account re-check inside the transaction makes a double-submit or a
+ * concurrent import skip the row instead of creating a duplicate card.
+ */
+export async function createDiscoveredCards(
+  userId: string,
+  householdId: string,
+  cards: DiscoveredCardCreate[]
+): Promise<{ cardId: string; cardName: string; plaidItemId: string }[]> {
+  return prisma.$transaction(async (tx) => {
+    const created: { cardId: string; cardName: string; plaidItemId: string }[] = []
+    for (const card of cards) {
+      const link = await tx.plaidAccount.findFirst({
+        where: {
+          id: card.plaidAccountId,
+          creditCardId: null,
+          plaidItem: { userId },
+        },
+        select: { id: true, plaidItemId: true },
+      })
+      if (!link) continue
+      const row = await tx.creditCard.create({
+        data: {
+          householdId,
+          cardName: card.cardName,
+          issuer: card.issuer,
+          issuerKey: card.issuerKey,
+          lastFour: card.lastFour,
+          currency: card.currency,
+          currentBalanceMinor: card.currentBalanceMinor,
+          attribution: "SHARED",
+          syncStatus: "SYNC_PENDING",
+        },
+        select: { id: true, cardName: true },
+      })
+      // Atomic claim (review finding): the WHERE re-asserts creditCardId null
+      // so a concurrent import that won the race matches zero rows — this
+      // card create is then undone instead of surviving as an orphan.
+      const claimed = await tx.plaidAccount.updateMany({
+        where: { id: link.id, creditCardId: null },
+        data: { creditCardId: row.id },
+      })
+      if (claimed.count === 0) {
+        await tx.creditCard.delete({ where: { id: row.id } })
+        continue
+      }
+      created.push({ cardId: row.id, cardName: row.cardName, plaidItemId: link.plaidItemId })
+    }
+    return created
+  })
+}
+
+/** The item's linked cards with the provenance snapshot the planner gates on. */
+export async function findPlaidLinkedCards(plaidItemId: string) {
+  return prisma.plaidAccount.findMany({
+    where: { plaidItemId, creditCardId: { not: null } },
+    select: {
+      accountId: true,
+      creditCard: {
+        select: {
+          id: true,
+          householdId: true,
+          currency: true,
+          regularAprBps: true,
+          aprSource: true,
+          creditLimitMinor: true,
+          limitSource: true,
+          minimumPaymentMinor: true,
+          minimumSource: true,
+          paymentDueDay: true,
+          dueDaySource: true,
+          promoPeriods: { where: { status: "ACTIVE" }, select: { id: true } },
+        },
+      },
+    },
+  })
+}
+
+/**
+ * Apply one card's liability plan: field sets + SYNCED stamp, and the
+ * suggestion transitions — created PENDING when new; re-opened when the
+ * provider's proposal CHANGED (dismissal pins the user's value against that
+ * proposal only); left untouched when the proposal is unchanged.
+ * Returns how many suggestions were created or re-opened.
+ */
+export async function applyLiabilityPlan(
+  cardId: string,
+  plan: LiabilityApplyPlan,
+  syncedAt: Date
+): Promise<{ suggestionsOpened: number }> {
+  return prisma.$transaction(async (tx) => {
+    await tx.creditCard.update({
+      where: { id: cardId },
+      data: { ...plan.sets, syncStatus: "SYNCED", lastSyncedAt: syncedAt },
+    })
+    let suggestionsOpened = 0
+    for (const s of plan.suggestions) {
+      const field = s.field as SuggestedCardField
+      const existing = await tx.cardProviderSuggestion.findUnique({
+        where: { cardId_field: { cardId, field } },
+        select: { id: true, proposedValue: true, status: true },
+      })
+      if (!existing) {
+        await tx.cardProviderSuggestion.create({
+          data: {
+            cardId,
+            field,
+            proposedValue: s.proposedValue,
+            currentValue: s.currentValue,
+          },
+        })
+        suggestionsOpened++
+      } else if (existing.proposedValue !== s.proposedValue) {
+        await tx.cardProviderSuggestion.update({
+          where: { id: existing.id },
+          data: {
+            proposedValue: s.proposedValue,
+            currentValue: s.currentValue,
+            status: "PENDING",
+            resolvedAt: null,
+          },
+        })
+        suggestionsOpened++
+      } else if (existing.status === "PENDING") {
+        await tx.cardProviderSuggestion.update({
+          where: { id: existing.id },
+          data: { currentValue: s.currentValue },
+        })
+      }
+      // Same proposal already ACCEPTED/DISMISSED — pinned, nothing to do.
+    }
+    // Close PENDING suggestions whose divergence has cleared (review
+    // finding): the provider reported the field this sync (evaluated) yet no
+    // suggestion resulted — the user now agrees with the provider or cleared
+    // the field. Unreported fields stay untouched (unknown ≠ resolved).
+    const stillOpen = new Set(plan.suggestions.map((s) => s.field))
+    const clearedFields = plan.evaluated.filter((f) => !stillOpen.has(f))
+    if (clearedFields.length > 0) {
+      await tx.cardProviderSuggestion.deleteMany({
+        where: {
+          cardId,
+          status: "PENDING",
+          field: { in: clearedFields as SuggestedCardField[] },
+        },
+      })
+    }
+    return { suggestionsOpened }
+  })
+}
+
+/** Sweep the item's linked cards to a sync status (SYNC_FAILED on error paths). */
+export async function markPlaidCardsSyncStatus(
+  plaidItemId: string,
+  syncStatus: "SYNCED" | "SYNC_FAILED",
+  syncedAt?: Date
+) {
+  return prisma.creditCard.updateMany({
+    where: { plaidAccount: { plaidItemId } },
+    data: { syncStatus, ...(syncedAt ? { lastSyncedAt: syncedAt } : {}) },
+  })
+}
+
+/** Pending provider suggestions across the household — the review panel read. */
+export async function findPendingSuggestions(householdId: string) {
+  return prisma.cardProviderSuggestion.findMany({
+    where: { status: "PENDING", card: { householdId } },
+    select: {
+      id: true,
+      field: true,
+      proposedValue: true,
+      currentValue: true,
+      createdAt: true,
+      card: { select: { id: true, cardName: true } },
+    },
+    orderBy: [{ createdAt: "asc" }],
+  })
+}
+
+/** Column mapping for an accepted suggestion — provenance flips to PLAID. */
+function suggestionApplyData(field: SuggestedCardField, value: string) {
+  switch (field) {
+    case "REGULAR_APR_BPS":
+      return { regularAprBps: Number(value), aprSource: "PLAID" as const }
+    case "CREDIT_LIMIT_MINOR":
+      return { creditLimitMinor: BigInt(value), limitSource: "PLAID" as const }
+    case "MINIMUM_PAYMENT_MINOR":
+      return { minimumPaymentMinor: BigInt(value), minimumSource: "PLAID" as const }
+    case "PAYMENT_DUE_DAY":
+      return { paymentDueDay: Number(value), dueDaySource: "PLAID" as const }
+  }
+}
+
+/**
+ * Resolve a PENDING suggestion within the caller's household. Accepting
+ * applies the proposed value and flips the field's provenance to PLAID;
+ * dismissing pins the user's value against this proposal. Household-scoped
+ * WHERE throughout (EDR-014); returns null for cross-household/missing/
+ * already-resolved ids.
+ */
+export async function resolveSuggestion(
+  householdId: string,
+  suggestionId: string,
+  resolution: "accepted" | "dismissed"
+): Promise<{ cardId: string; cardName: string; field: SuggestedCardField } | null> {
+  return prisma.$transaction(async (tx) => {
+    const suggestion = await tx.cardProviderSuggestion.findFirst({
+      where: { id: suggestionId, status: "PENDING", card: { householdId } },
+      select: {
+        id: true,
+        field: true,
+        proposedValue: true,
+        card: { select: { id: true, cardName: true } },
+      },
+    })
+    if (!suggestion) return null
+    if (resolution === "accepted") {
+      // A promo added since the suggestion opened makes an APR acceptance
+      // stale: card-level APR must stay null while a promo shelters the
+      // balance (review finding). Close the row and report not-open.
+      if (suggestion.field === "REGULAR_APR_BPS") {
+        const activePromos = await tx.promoPeriod.count({
+          where: { cardId: suggestion.card.id, status: "ACTIVE" },
+        })
+        if (activePromos > 0) {
+          await tx.cardProviderSuggestion.delete({ where: { id: suggestion.id } })
+          return null
+        }
+      }
+      await tx.creditCard.updateMany({
+        where: { id: suggestion.card.id, householdId },
+        data: suggestionApplyData(suggestion.field, suggestion.proposedValue),
+      })
+    }
+    await tx.cardProviderSuggestion.update({
+      where: { id: suggestion.id },
+      data: {
+        status: resolution === "accepted" ? "ACCEPTED" : "DISMISSED",
+        resolvedAt: new Date(),
+      },
+    })
+    return {
+      cardId: suggestion.card.id,
+      cardName: suggestion.card.cardName,
+      field: suggestion.field,
     }
   })
 }

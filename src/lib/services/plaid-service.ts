@@ -599,6 +599,39 @@ async function runTransactionSync(
   return { added: totalAdded, modified: totalModified, removed: totalRemoved };
 }
 
+// ─── Liabilities (raw fetch — issue #109) ───────────────────────────
+
+/**
+ * Fetch the item's liabilities payload. Thin I/O only: decrypt, call, return
+ * SDK shapes. Normalization/unit conversion and all card-domain writes live
+ * in the cards feature layer (EDR-019 keeps math out of services).
+ */
+export async function getLiabilitiesForItem(plaidItemId: string): Promise<{
+  accounts: import('plaid').AccountBase[];
+  credit: import('plaid').CreditCardLiability[];
+}> {
+  const plaidItem = await prisma.plaidItem.findUnique({
+    where: { id: plaidItemId },
+  });
+  if (!plaidItem) {
+    throw new Error('PlaidItem not found');
+  }
+
+  const client = getPlaidClient();
+  const accessToken = decrypt(plaidItem.accessToken);
+
+  const response = await client.liabilitiesGet({
+    ...plaidCredentials(),
+    access_token: accessToken,
+  });
+
+  console.log('[Plaid] liabilitiesGet request_id:', response.data.request_id);
+  return {
+    accounts: response.data.accounts,
+    credit: response.data.liabilities.credit ?? [],
+  };
+}
+
 // ─── Disconnect Item (keep data) ─────────────────────────────────────
 
 export async function disconnectPlaidItem(

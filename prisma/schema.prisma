@@ -230,6 +230,8 @@ enum NotificationType {
   DUE_SOON
   SYNC_FAILED
   PAYMENT_REMINDER // an imminent SCHEDULED payment the user planned (issue #46)
+  CARD_DISCOVERED // Plaid-linked credit accounts awaiting review/import (issue #109)
+  PROVIDER_MISMATCH // pending provider-vs-manual field suggestions (issue #109)
 }
 
 model Notification {
@@ -293,6 +295,7 @@ model PlaidAccount {
   plaidItemId   String
   accountId     String  @unique // Plaid account_id — the only matching key
   userAccountId String? @unique // linked local ledger account
+  creditCardId  String? @unique // card-domain link (Liabilities epic, #109); null ⇒ discovered-but-unimported
   mask          String? // display only; never used for matching
   name          String?
 
@@ -301,6 +304,7 @@ model PlaidAccount {
 
   plaidItem   PlaidItem    @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
   userAccount UserAccount? @relation(fields: [userAccountId], references: [id], onDelete: SetNull)
+  creditCard  CreditCard?  @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
 
   @@index([plaidItemId])
 }
@@ -468,6 +472,7 @@ model CreditCard {
   limitSource   FieldSource @default(UNKNOWN)
   aprSource     FieldSource @default(UNKNOWN)
   minimumSource FieldSource @default(UNKNOWN)
+  dueDaySource  FieldSource @default(UNKNOWN) // paymentDueDay provenance (issue #109)
 
   userAccountId String? // optional aggregator link
   // Verbatim Monarch "Account" string, e.g. "Quicksilver (...8391)" — the ONLY
@@ -488,11 +493,49 @@ model CreditCard {
   scheduledPayments ScheduledPayment[]
   statements        Statement[]
   autopayLink       ProviderAutopayLink?
+  plaidAccount      PlaidAccount?
+  suggestions       CardProviderSuggestion[]
 
   @@index([householdId])
   // Race backstop for concurrent Monarch imports: one card per account key
   // per household (Postgres treats NULLs as distinct — unkeyed cards free).
   @@unique([householdId, monarchAccountKey])
+}
+
+// Provider-vs-manual field divergence awaiting the user's call (issue #109).
+// One row per (card, field): a new differing provider value re-opens a
+// DISMISSED row only when the proposal actually changed — dismissal pins the
+// user's value against THAT proposal, not forever. Values are canonical
+// integer strings (bps / minor cents / day-of-month) — provenance metadata,
+// not money math (EDR-019 stays in lib/finance).
+enum SuggestedCardField {
+  REGULAR_APR_BPS
+  CREDIT_LIMIT_MINOR
+  MINIMUM_PAYMENT_MINOR
+  PAYMENT_DUE_DAY
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+}
+
+model CardProviderSuggestion {
+  id            String             @id @default(cuid())
+  cardId        String
+  field         SuggestedCardField
+  proposedValue String
+  currentValue  String? // snapshot of the user's value when proposed
+  status        SuggestionStatus   @default(PENDING)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  resolvedAt    DateTime?
+
+  card CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, field])
+  @@index([cardId, status])
 }
 
 // Inside the CreditCard aggregate — edited with the card (EDR-017).
