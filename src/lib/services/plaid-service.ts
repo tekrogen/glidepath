@@ -326,41 +326,91 @@ export async function syncAccounts(plaidItemId: string): Promise<{
       balance: mapped.balance,
       institution: plaidItem.institutionName || 'Connected Account',
     };
+    const linkMeta = {
+      mask: plaidAccount.mask ?? null,
+      name: plaidAccount.name ?? null,
+    };
 
-    let userAccountId: string;
-    if (action.kind === 'update' || action.kind === 'adopt') {
+    if (action.kind === 'update') {
       await prisma.userAccount.update({ where: { id: action.userAccountId }, data });
-      userAccountId = action.userAccountId;
-    } else {
-      const created = await prisma.userAccount.create({
-        data: {
-          userId: plaidItem.userId,
-          ...data,
-          accountNumber: mapped.accountNumber,
-        },
+      await prisma.plaidAccount.update({
+        where: { accountId: action.accountId },
+        data: linkMeta,
       });
-      userAccountId = created.id;
+      accountsUpdated++;
+      continue;
     }
 
-    await prisma.plaidAccount.upsert({
-      where: { accountId: action.accountId },
-      update: {
-        userAccountId,
-        mask: plaidAccount.mask ?? null,
-        name: plaidAccount.name ?? null,
-      },
-      create: {
-        plaidItemId,
-        accountId: action.accountId,
-        userAccountId,
-        mask: plaidAccount.mask ?? null,
-        name: plaidAccount.name ?? null,
-      },
-    });
+    // 'adopt'/'create' can race a concurrent syncAccounts — this function
+    // holds no lock, and the linking flow legitimately runs it twice (inline
+    // exchange sync vs the INITIAL_UPDATE webhook's backfill). The spine's
+    // unique constraints are the arbiter: the link row is claimed in the same
+    // transaction that writes the local account, so a lost race rolls the
+    // account back instead of orphaning a duplicate.
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (action.kind === 'adopt') {
+          await tx.userAccount.update({ where: { id: action.userAccountId }, data });
+          await tx.plaidAccount.create({
+            data: {
+              plaidItemId,
+              accountId: action.accountId,
+              userAccountId: action.userAccountId,
+              ...linkMeta,
+            },
+          });
+        } else {
+          const created = await tx.userAccount.create({
+            data: {
+              userId: plaidItem.userId,
+              ...data,
+              accountNumber: mapped.accountNumber,
+            },
+          });
+          // A severed link (userAccountId null) may already hold this
+          // accountId — reclaim it; otherwise create the link.
+          const reclaimed = await tx.plaidAccount.updateMany({
+            where: { accountId: action.accountId, userAccountId: null },
+            data: { userAccountId: created.id, ...linkMeta },
+          });
+          if (reclaimed.count === 0) {
+            await tx.plaidAccount.create({
+              data: {
+                plaidItemId,
+                accountId: action.accountId,
+                userAccountId: created.id,
+                ...linkMeta,
+              },
+            });
+          }
+        }
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Lost the race: another sync claimed this accountId (or the adoption
+      // target). Write through the winner's link when it exists; otherwise
+      // skip — the next sync replans against the settled spine.
+      const link = await prisma.plaidAccount.findUnique({
+        where: { accountId: action.accountId },
+        select: { userAccountId: true },
+      });
+      if (link?.userAccountId) {
+        await prisma.userAccount.update({ where: { id: link.userAccountId }, data });
+      }
+    }
     accountsUpdated++;
   }
 
   return { accountsUpdated };
+}
+
+/** Prisma P2002: unique-constraint violation — the race arbiter in syncAccounts. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
 }
 
 // ─── Sync Transactions (Cursor-Based) ───────────────────────────────
