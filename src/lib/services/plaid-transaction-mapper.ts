@@ -1,5 +1,6 @@
 import type { Transaction as PlaidTransaction, AccountBase } from 'plaid';
 import { categorizeTransaction } from '@/lib/categories';
+import { formatPlaidMask } from './plaid-account-matching';
 
 // ─── Account Type Mapping ───────────────────────────────────────────
 
@@ -156,7 +157,7 @@ export function mapPlaidAccount(
   institutionName: string | null
 ): MappedAccount {
   const balance = account.balances.current ?? account.balances.available ?? 0;
-  const mask = account.mask ? `...${account.mask}` : `...${account.account_id.slice(-4)}`;
+  const mask = formatPlaidMask(account);
   const name = account.name || account.official_name || `${institutionName || 'Connected'} Account`;
 
   return {
