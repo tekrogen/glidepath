@@ -1,142 +1,1125 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. What follows are behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+This file defines the operating rules for Claude Code and other AI coding assistants working in this repository.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+These instructions are intended to reduce common AI-assisted coding mistakes, protect project-specific business rules, and ensure that work is grounded in the repository's authoritative documentation.
 
-## Rules
+Project-specific instructions may extend these rules, but they must not silently override them.
 
-These must be followed with no exceptions:
-
-1. Do not ever include an AI or Bot generated `Co-Authored` code such as: `Co-Authored-By: Claude …` or `Co-Authored-By: Fable …` trailer in commits in this code base.
-2. **Check files first, assume nothing.** When there is any confusion, contradiction, or ambiguity — especially about what this project *is*, what it references, or how it relates to other projects (the DS repo, the two surfaces, vendored vs authored code) — verify against the documents, the data, and the codebase (README, CLAUDE.md, `git remote -v`, `git log`, `grep`) *before* answering or acting. Treat the repository's own files as authoritative over anything stated in chat, including loosely-worded inputs and your own prior statements. Report what the files say, then reason. Never carry an unverified claim from conversation forward as fact.
-3. **Follow the branch-naming convention** (see Governance): `<type>/<issue#>-<slug>`, issue first, PR body `Closes #N`.
-4. **Review and validate every UI/UX artifact before declaring it done.** Any UI/UX you author or change here (a mockup surface, a screen, an `admin/review/` artifact, any HTML/CSS) must be (a) **designed to the expert review method** and (b) **validated against the Tekrogen Brand Design System** — *before* hand-off, not after the user reports a defect. The operating brief lives in **`/Volumes/SERV01-DTMAC/_Code_Library/AI prompts/`** — read it when doing this work:
-- **`Design-System-UIUX-Review-Prompt.md`** — the **expert panel** (Senior Product Designer · Design Systems Architect · Front-End Engineering Lead · Visual/UI Designer): visual hierarchy/legibility, token/scale/spacing discipline. Apply every lens the brief defines; be evidence-based.
-5. **Agents** – the agents live in `/Volumes/SERV01-DTMAC/_Code_Library/AI Agents/` (additional agent definitions in `/Volumes/SERV01-DTMAC/_Code_Library/.claude/agents/`)
-6. **Canonical documentation only.** Every planning document must reference only canonical documentation — one authoritative file per topic (architecture: `admin/internal/features-planning/architecture/README.md`; plan: `admin/internal/planning/PRODUCTION-BLUEPRINT.md`). Superseded versions are archived, not left in place; a document that cites a broken or non-canonical path is a defect.
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-You are operating autonomously. The user is not watching in real time and cannot answer questions mid-task, so asking "Want me to…?" or "Shall I…?" will block the work. For reversible actions that follow from the original request, proceed without asking. Offering follow-ups after the task is done is fine; asking permission after already discussing with the user before doing the work is not. Before ending your turn, check your last paragraph. If it is a plan, an analysis, a question, a list of next steps, or a promise about work you have not done ("I'll…", "let me know when…"), do that work now with tool calls. End your turn only when the task is complete or you are blocked on input only the user can provide.
-
-Pause for the user only when the work genuinely requires them: a destructive or irreversible action, a real scope change, or input that only they can provide. If you hit one of these, ask and end the turn, rather than ending on a promise.
-
-Delegate independent subtasks to subagents and keep working while they run. Intervene if a subagent goes off track or is missing relevant context.
-
-Store one lesson per file with a one-line summary at the top. Record corrections and confirmed approaches alike, including why they mattered. Don't save what the repo or chat history already records; update an existing note rather than creating a duplicate; delete notes that turn out to be wrong.
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+> **Operating bias:** Favor correctness, verification, and minimal changes over speed. Use judgment for truly trivial tasks.
 
 ---
 
-## Project Notes — Credit Card Manager
+# 1. Non-Negotiable Rules
 
-Project-specific conventions and gotchas. The behavioral guidelines above still apply.
+The following rules apply without exception.
 
-### Running the app
+## 1.1 Never add AI attribution to commits
 
-- Dev server runs on **port 6020** (`pnpm dev`, `pnpm dev:https`, `pnpm start` all pin it). If Next reports "Port 6020 is in use" and falls back to another port, a stale server is running — kill it; auth breaks on the fallback port because `NEXTAUTH_URL` is port-specific.
-- `pnpm dev:https` auto-generates certificates into `certificates/` (gitignored) via Next's `--experimental-https`. When using HTTPS regularly, set `NEXTAUTH_URL=https://localhost:6020`; keep `http://` for plain `pnpm dev`.
-- **Env file is `.env`, not `.env.local`** — the Prisma CLI only loads `.env`; Next.js loads both. Everything (README, seed, scripts) assumes `.env`.
+Do not add AI-generated authorship or co-authorship trailers to commits.
 
-### Data conventions (load-bearing)
+Prohibited examples include:
 
-- **RBAC**: USER and ADMIN are orthogonal — ADMIN has *no* `financial:*` permissions by design. An admin sees an empty dashboard; that is intentional, not a bug.
-- **Money**: new card-domain tables store integer minor units (`BigInt` cents) + ISO currency; APRs are integer basis points (2274 = 22.74%). Legacy v1 tables stay `Decimal` until their domain migrates (EDR-008). `bigint` cannot cross the RSC → client-component prop boundary — serialize as `number` cents.
-- **All financial math lives in `src/lib/finance`** (pure, no I/O). Math in a component, page, or route file is a review-blocking defect (EDR-019). Interest figures are simple estimates (balance × APR ÷ 12) and always render with the `~` EstimatedValue component (EDR-020).
-- **One status engine**: `src/features/cards/utils/card-status.ts` is the only alert/badge derivation path. FROZEN outranks alerts; connection/sync state never appears in the status badge.
-- **Never key or match cards on last-four** — real portfolios contain duplicates (it's a seeded test fixture).
+```text
+Co-Authored-By: Claude ...
+Co-Authored-By: Fable ...
+```
 
-### Theme & UIUX sources (EDR-013 — final; two earlier readings were wrong)
+Do not add equivalent attribution for any other AI assistant, agent, or bot.
 
-- **UIUX architecture** (shell, sidebar IA, page composition, headers) follows the **mockup** in `admin/internal/theme/credit-card-manager-mockup/` and the newest wireframes in `admin/internal/features-planning/`.
-- **Colors, tokens, and fonts** come exclusively from **`admin/internal/theme/css`**, which must stay byte-synced with `src/app/css` (edit both together). Wealth palette, Inter body / Syne headings, light + dark.
-- The mockup is **never** a visual/token source, and Glidepath is **not** an Ebia iteration — Ebia donates component idiom only where it fits the theme.
-- Enforced by `tests/e2e/theme-and-shell.spec.ts` (computed-token + sidebar-IA conformance). When theme values change, update that spec's expected constants deliberately.
+---
 
-### Local environment
+## 1.2 Verify repository facts before acting
 
-- **PostgreSQL runs via Postgres.app** (localhost:5432), *not* Docker — `docker-compose.yml` exists for other environments but don't start Docker for the DB here.
-- **Phone/LAN testing**: `pnpm dev:lan` (detects the LAN IP, binds 0.0.0.0, overrides `NEXTAUTH_URL` for the run). Plain `pnpm dev` breaks sign-in from other devices because `NEXTAUTH_URL` pins localhost/https → secure cookies dropped + unreachable redirects. Google/GitHub OAuth only work on provider-registered hosts — use demo credentials on LAN.
-- **`admin/internal/` is local-only by design** (gitignored): the planning corpus, Production Blueprint, phase-gate records, and real tracker data never reach the public repo.
+Repository files are the source of truth.
 
-### Workflow (phase gates + PRs)
+When there is confusion, contradiction, ambiguity, or uncertainty, verify the relevant facts against the repository before answering or changing code.
 
-- Every code change: issue → `<type>/<issue#>-<slug>` branch → PR (`Closes #N`) → CI green → **squash-merge with a plain conventional title**. Branch protection on `main` requires both CI checks; admins exempt for emergencies.
-- Phases exit through the checklist in `admin/internal/planning/PHASE-GATES.md` (CI green, verify criteria, issue triage — no open critical/high for the phase, design QA for UI, release cut). Defects are filed as issues the moment they're found.
-- The seed **is** the test fixture (`SEED_VERSION 3` = the Hi-Fi dataset + payment-domain fixture; tiles reconcile to the cent). Changing seed data or a finance formula must update the conformance suites knowingly — a to-the-cent test failure means the spec changed or the code is wrong, never "flaky".
+This is especially important when determining:
 
-### Things that must stay in sync (change one → change all)
+* what the project is
+* which repository or surface is being discussed
+* how this project relates to other repositories
+* whether code is authored, generated, copied, or vendored
+* which documentation is current
+* which implementation path is canonical
+* whether a statement from chat is accurate
 
-- **Color theme names** (`blue`/`orange`/`midnight`) live in three places: `lib/themes.ts`, the anti-FOUC inline script in `app/layout.tsx`, and the `[data-theme="..."]` blocks in `app/css/styles.css`.
-- **Demo credentials** live in three places: `lib/auth/providers.ts` (`DEMO_USER`), `prisma/seed.ts` (`DEMO_EMAIL`), and `components/auth/signin-form.tsx` (autofill constants).
+Use the appropriate repository evidence, including:
 
+```bash
+README.md
+CLAUDE.md
+git remote -v
+git log
+grep
+```
 
+Also inspect the relevant code, configuration, documentation, tests, and data.
 
-### E2E (Playwright)
+Treat repository evidence as authoritative over:
 
-- **Three projects**: `setup` (demo login → `tests/.auth/user.json`), `public` (no session), `authenticated` (reuses storageState). Config: `playwright.config.ts`.
-- **`pnpm test:e2e`** seeds the DB and starts the dev server when none is running (`webServer.command`). In CI set `CI=true` for a fresh server every run.
-- **Demo auth in tests**: `webServer.env` sets `ENABLE_DEMO_AUTH=true`; do not reference Ebia's `ENABLE_TEST_AUTH` — it does not exist here.
-- **Port 6020** is hardcoded in `baseURL`, `NEXTAUTH_URL`, and dev scripts; keep them aligned.
+* loosely worded user messages
+* chat history
+* prior AI statements
+* model memory
+* unverified assumptions
 
-### Releases and commits
+Report what the repository says before reasoning from it.
 
-- **Release Please** drives versioning from conventional commit headers on `main`. The husky hook auto-prefixes local commits with an emoji (`✨ feat: ...`), which Release Please **cannot parse** — so feature PRs must be **squash-merged with a plain conventional title** (no emoji). Branch commits can keep the emoji style.
-- Version baseline: `.release-please-manifest.json` at `1.0.0`, matching the `v1.0.0` tag on the initial commit.
-- **CHANGELOG.md updates only when a Release Please PR merges** (never per commit); that merge creates the git tag and the GitHub Release together. The repo setting "Allow GitHub Actions to create and approve pull requests" must stay enabled or Release Please fails silently on every push.
-- CI runs on bot-created PRs may show "action required" (GitHub holds workflow approval for bots) — main's own push run is the authoritative signal.
+Never carry an unverified claim from conversation forward as fact.
+
+---
+
+## 1.3 Follow repository governance
+
+Every code change must follow the project's governance process.
+
+Branch names must use:
+
+```text
+<type>/<issue#>-<slug>
+```
+
+Requirements:
+
+* Put the issue number before the slug.
+* Reference the issue in the pull request.
+* Include `Closes #N` in the pull request body.
+* Follow the repository's merge and release conventions.
+* Do not invent an alternative workflow.
+
+See the project workflow section below for the complete process.
+
+---
+
+## 1.4 Review and validate every UI/UX artifact
+
+Any UI or UX artifact created or modified in this repository must be reviewed before it is declared complete.
+
+This applies to:
+
+* application screens
+* mockup surfaces
+* prototypes
+* `admin/review/` artifacts
+* page layouts
+* components
+* HTML
+* CSS
+* design tokens
+* responsive behavior
+* visual documentation
+
+Every UI/UX artifact must satisfy both requirements below.
+
+### A. Use the expert review method
+
+The operating brief is stored in:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/AI prompts/
+```
+
+For UI/UX work, read and apply:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/AI prompts/Design-System-UIUX-Review-Prompt.md
+```
+
+This file defines the required expert review panel:
+
+* Senior Product Designer
+* Design Systems Architect
+* Front-End Engineering Lead
+* Visual/UI Designer
+
+Apply every review lens defined in the brief.
+
+The review must be evidence-based and must address, at minimum:
+
+* visual hierarchy
+* readability and legibility
+* typography
+* scale
+* spacing
+* alignment
+* component consistency
+* design-token discipline
+* responsive behavior
+* implementation quality
+
+Do not substitute a general visual opinion for the prescribed review method.
+
+### B. Validate against the Tekrogen Brand Design System
+
+Before hand-off, verify that the artifact conforms to the Tekrogen Brand Design System and the repository's approved theme sources.
+
+Validation must happen before declaring the work complete—not after the user reports a defect.
+
+A UI/UX change is incomplete until both the expert review method and brand-system validation have been performed.
+
+---
+
+## 1.5 Use the approved agent definitions
+
+Reusable AI agents are stored in:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/AI Agents/
+```
+
+Additional Claude-specific agent definitions are stored in:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/.claude/agents/
+```
+
+Use these directories when:
+
+* delegating work to a specialized agent
+* locating an existing agent definition
+* selecting an expert role
+* coordinating independent subtasks
+* determining an agent's expected behavior or output
+
+Do not recreate an agent that already exists in the approved agent library.
+
+Before using or modifying an agent, inspect its definition and preserve its intended scope.
+
+When multiple agent definitions appear relevant, choose the most specific definition supported by the task.
+
+---
+
+## 1.6 Use canonical documentation only
+
+Each topic must have one authoritative document.
+
+Planning documents, implementation plans, issue descriptions, agent outputs, and technical references must cite only canonical documentation.
+
+The canonical architecture source is:
+
+```text
+admin/internal/features-planning/architecture/README.md
+```
+
+Its purpose is to define the approved system architecture, architectural boundaries, and current architectural decisions.
+
+The canonical production plan is:
+
+```text
+admin/internal/planning/PRODUCTION-BLUEPRINT.md
+```
+
+Its purpose is to define the authoritative implementation plan, sequencing, phase expectations, and production roadmap.
+
+Requirements:
+
+* Do not cite superseded versions.
+* Do not leave obsolete copies beside canonical files.
+* Archive superseded documents.
+* Do not create competing authoritative documents.
+* Do not reference broken paths.
+* Do not use historical documents as current requirements.
+* Confirm that referenced paths exist before publishing planning material.
+
+A planning document that cites a broken, superseded, or non-canonical path is defective.
+
+---
+
+# 2. Think Before Coding
+
+Do not assume. Do not conceal uncertainty. Surface meaningful tradeoffs.
+
+Before implementing:
+
+* State material assumptions explicitly.
+* Verify uncertain repository facts.
+* Identify competing interpretations when they affect the result.
+* Present meaningful tradeoffs instead of silently choosing.
+* Point out a simpler approach when one exists.
+* Push back when the requested approach is unnecessarily complex or conflicts with project rules.
+* Stop only when progress genuinely requires information the user alone can provide.
+
+Do not ask questions merely to avoid making a reasonable, reversible decision.
+
+---
+
+# 3. Autonomous Execution
+
+Operate autonomously within the user's original request.
+
+The user may not be watching in real time and may not be available to answer questions during execution.
+
+For actions that are reversible and clearly implied by the request:
+
+* proceed without asking
+* verify the result
+* report what was done
+
+Do not block work with questions such as:
+
+* “Want me to continue?”
+* “Shall I make the change?”
+* “Would you like me to run the tests?”
+
+If those actions are already implied by the task, perform them.
+
+Pause only when the work requires:
+
+* a destructive action
+* an irreversible action
+* a genuine scope change
+* credentials or secrets
+* a business decision only the user can make
+* information that cannot be determined from the repository
+
+Before ending a task, inspect the final paragraph of your response.
+
+Do not end with:
+
+* an unexecuted plan
+* a promise of future work
+* a list of steps you could perform now
+* a question that unnecessarily blocks completion
+* “I will...”
+* “Let me know when...”
+
+Complete the work before ending whenever the required tools and information are available.
+
+---
+
+# 4. Delegate Independent Work Appropriately
+
+Delegate independent subtasks to approved agents when doing so improves accuracy or throughput.
+
+Use the approved agent definitions from:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/AI Agents/
+```
+
+and:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/.claude/agents/
+```
+
+Continue working on independent tasks while delegated work is in progress.
+
+Review all delegated output before using it.
+
+Intervene when an agent:
+
+* drifts from scope
+* ignores repository rules
+* lacks necessary context
+* references non-canonical documentation
+* proposes unsupported assumptions
+* returns unverifiable conclusions
+
+Delegation does not transfer responsibility. The primary assistant remains responsible for the final result.
+
+---
+
+# 5. Simplicity First
+
+Implement the minimum code that correctly solves the requested problem.
+
+Do not add:
+
+* features that were not requested
+* abstractions for one-time behavior
+* speculative configurability
+* generalized frameworks without an immediate need
+* error handling for impossible scenarios
+* premature extension points
+* unrelated cleanup
+
+If an implementation is substantially larger than necessary, simplify it.
+
+Ask:
+
+> Would a senior engineer consider this overcomplicated?
+
+If the answer is yes, reduce the solution.
+
+---
+
+# 6. Make Surgical Changes
+
+Touch only what the task requires.
+
+When editing existing code:
+
+* Match the existing style.
+* Preserve established patterns.
+* Avoid unrelated refactoring.
+* Avoid opportunistic cleanup.
+* Avoid formatting unrelated files.
+* Do not rewrite comments that are outside the task.
+* Do not “improve” adjacent code merely because you noticed it.
+* Mention unrelated defects rather than silently fixing them.
+
+When your changes create unused code:
+
+* Remove imports made unused by your changes.
+* Remove variables made unused by your changes.
+* Remove functions made unused by your changes.
+* Do not remove pre-existing dead code unless requested.
+
+Every changed line should trace directly to the user's request or to verification required by that request.
+
+---
+
+# 7. Define Success Before Implementation
+
+Translate requests into verifiable outcomes.
+
+Examples:
+
+```text
+“Add validation”
+→ Write or identify tests for invalid input, implement validation, and verify the tests pass.
+```
+
+```text
+“Fix the bug”
+→ Reproduce the failure, add a regression test when appropriate, implement the fix, and verify the failure no longer occurs.
+```
+
+```text
+“Refactor X”
+→ Establish baseline behavior, perform the refactor, and verify behavior remains unchanged.
+```
+
+For multi-step tasks, use a concise execution plan:
+
+```text
+1. [Action] → verify: [evidence]
+2. [Action] → verify: [evidence]
+3. [Action] → verify: [evidence]
+```
+
+Strong success criteria enable independent execution.
+
+Avoid vague criteria such as:
+
+```text
+Make it work.
+Improve the code.
+Clean this up.
+```
+
+Replace them with observable outcomes.
+
+---
+
+# 8. Verify Before Declaring Completion
+
+Never declare work complete based only on code inspection or confidence.
+
+Use the verification methods appropriate to the change:
+
+* unit tests
+* integration tests
+* end-to-end tests
+* type checking
+* linting
+* production builds
+* runtime validation
+* database validation
+* visual review
+* responsive testing
+* design-system validation
+* accessibility checks
+* regression checks
+
+For UI/UX work, verification must also follow:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/AI prompts/Design-System-UIUX-Review-Prompt.md
+```
+
+and the Tekrogen Brand Design System.
+
+If a verification step cannot be run, state:
+
+* which step was not run
+* why it could not be run
+* what evidence was used instead
+* what remains unverified
+
+Do not describe unverified work as fully validated.
+
+---
+
+# 9. Record Durable Lessons Carefully
+
+Store one durable lesson per file.
+
+Each lesson file must begin with a one-line summary.
+
+Record:
+
+* confirmed approaches
+* corrections
+* failed assumptions
+* why the lesson mattered
+
+Do not record:
+
+* facts already documented by the repository
+* information already preserved in chat history
+* duplicate lessons
+* speculative conclusions
+
+Update an existing lesson rather than creating a duplicate.
+
+Delete or correct lessons that are later proven wrong.
+
+---
+
+# 10. Project Notes — Credit Card Manager
+
+The following rules are specific to the Credit Card Manager project.
+
+The general behavioral rules above continue to apply.
+
+---
+
+## 10.1 Running the application
+
+The development server runs on port:
+
+```text
+6020
+```
+
+The following commands are pinned to that port:
+
+```bash
+pnpm dev
+pnpm dev:https
+pnpm start
+```
+
+If Next.js reports that port `6020` is in use and falls back to another port, a stale development server is running.
+
+Do not continue on the fallback port.
+
+Authentication depends on a port-specific `NEXTAUTH_URL`, so a fallback port can break sign-in behavior.
+
+Terminate the stale server and restart on port `6020`.
+
+### HTTPS development
+
+```bash
+pnpm dev:https
+```
+
+This command uses Next.js experimental HTTPS support and generates certificates in:
+
+```text
+certificates/
+```
+
+The directory is gitignored.
+
+When developing regularly over HTTPS, use:
+
+```env
+NEXTAUTH_URL=https://localhost:6020
+```
+
+For plain HTTP development, use:
+
+```env
+NEXTAUTH_URL=http://localhost:6020
+```
+
+### Environment file
+
+The project uses:
+
+```text
+.env
+```
+
+Do not move required configuration exclusively to:
+
+```text
+.env.local
+```
+
+The Prisma CLI loads `.env`, while Next.js can load both files.
+
+The project's README, seed process, and scripts assume `.env`.
+
+---
+
+## 10.2 Data conventions
+
+These rules are load-bearing.
+
+### Role-based access control
+
+`USER` and `ADMIN` are orthogonal roles.
+
+An `ADMIN` intentionally has no `financial:*` permissions.
+
+As a result, an administrator may see an empty financial dashboard.
+
+That behavior is intentional and must not be treated as a bug.
+
+### Monetary values
+
+New card-domain tables store money as:
+
+* integer minor units
+* `BigInt` cents
+* ISO currency codes
+
+APRs are stored as integer basis points.
+
+Example:
+
+```text
+2274 = 22.74%
+```
+
+Legacy v1 tables remain on `Decimal` until their domain migration under EDR-008.
+
+A JavaScript `bigint` cannot cross the React Server Component-to-client-component prop boundary.
+
+Serialize monetary values passed to client components as numeric cents.
+
+### Financial calculations
+
+All financial mathematics belongs in:
+
+```text
+src/lib/finance
+```
+
+The code in this directory must remain pure and perform no I/O.
+
+Financial calculations in any of the following are review-blocking defects:
+
+* components
+* pages
+* route handlers
+* UI utilities outside the finance domain
+
+This rule is governed by EDR-019.
+
+Interest values are simple estimates:
+
+```text
+balance × APR ÷ 12
+```
+
+Estimated interest values must render using the `EstimatedValue` component with a `~` indicator.
+
+This rule is governed by EDR-020.
+
+### Card status derivation
+
+The only approved card alert and badge derivation path is:
+
+```text
+src/features/cards/utils/card-status.ts
+```
+
+Do not create parallel status logic.
+
+Rules:
+
+* `FROZEN` outranks alert states.
+* Connection state must not appear in the card status badge.
+* Synchronization state must not appear in the card status badge.
+
+### Card identity
+
+Never key, deduplicate, or match cards using the last four digits.
+
+Real card portfolios can contain duplicate last-four values, and the seed data intentionally includes this case.
+
+---
+
+## 10.3 Theme and UI/UX sources
+
+EDR-013 is final.
+
+Two earlier interpretations were incorrect and must not be reintroduced.
+
+### UI architecture source
+
+Application shell, sidebar information architecture, page composition, and page headers follow:
+
+```text
+admin/internal/theme/credit-card-manager-mockup/
+```
+
+and the newest wireframes in:
+
+```text
+admin/internal/features-planning/
+```
+
+The mockup defines structural and compositional direction.
+
+### Theme source
+
+Colors, design tokens, and fonts come exclusively from:
+
+```text
+admin/internal/theme/css
+```
+
+This directory must remain byte-synchronized with:
+
+```text
+src/app/css
+```
+
+When changing theme CSS, edit both locations together.
+
+The approved visual system includes:
+
+* Wealth palette
+* Inter for body text
+* Syne for headings
+* light mode
+* dark mode
+
+### Source boundaries
+
+The mockup is not a color, token, or font source.
+
+Glidepath is not an Ebia iteration.
+
+Ebia may contribute component idioms only when those idioms fit the approved theme.
+
+### Automated enforcement
+
+Theme and shell conformance are enforced by:
+
+```text
+tests/e2e/theme-and-shell.spec.ts
+```
+
+The test validates:
+
+* computed token values
+* sidebar information architecture
+
+When theme values intentionally change, update the expected constants in this test deliberately.
+
+Do not weaken the test merely to make a change pass.
+
+### Required external UI/UX review source
+
+All UI/UX work must additionally be reviewed using:
+
+```text
+/Volumes/SERV01-DTMAC/_Code_Library/AI prompts/Design-System-UIUX-Review-Prompt.md
+```
+
+This external operating brief defines the expert review method and must be used alongside the repository-specific theme sources.
+
+---
+
+## 10.4 Local environment
+
+PostgreSQL runs through Postgres.app at:
+
+```text
+localhost:5432
+```
+
+Do not start Docker for the local database.
+
+A `docker-compose.yml` file exists for other environments, but it is not the source of truth for local database execution.
+
+### Phone and LAN testing
+
+Use:
+
+```bash
+pnpm dev:lan
+```
+
+This command:
+
+* detects the LAN IP
+* binds the application to `0.0.0.0`
+* overrides `NEXTAUTH_URL` for the current run
+
+Do not use plain `pnpm dev` for testing authentication from another device.
+
+Plain development mode pins authentication to localhost or HTTPS and can cause:
+
+* secure cookies to be dropped
+* redirects to unreachable localhost addresses
+* failed sign-in behavior
+
+Google and GitHub OAuth work only on provider-registered hosts.
+
+Use demo credentials during LAN testing.
+
+### Local-only administrative files
+
+The following directory is intentionally local-only:
+
+```text
+admin/internal/
+```
+
+It is gitignored by design.
+
+It contains:
+
+* the planning corpus
+* the Production Blueprint
+* phase-gate records
+* real tracker data
+
+Do not attempt to publish these files to the public repository.
+
+Do not assume that their absence from Git means they are obsolete.
+
+---
+
+## 10.5 Workflow, phase gates, and pull requests
+
+Every code change follows this sequence:
+
+```text
+Issue
+→ branch
+→ pull request
+→ CI green
+→ squash merge
+```
+
+Branch format:
+
+```text
+<type>/<issue#>-<slug>
+```
+
+Pull request body:
+
+```text
+Closes #N
+```
+
+Merge requirements:
+
+* CI must be green.
+* Use squash merge.
+* Use a plain conventional commit title.
+* Do not include an emoji in the squash-merge title.
+
+Branch protection on `main` requires both CI checks.
+
+Administrators are exempt only for emergencies.
+
+### Phase gates
+
+Phases exit through:
+
+```text
+admin/internal/planning/PHASE-GATES.md
+```
+
+The phase-exit checklist includes:
+
+* CI green
+* verification criteria satisfied
+* issue triage complete
+* no open critical or high-severity issues for the phase
+* design QA complete for UI work
+* release cut complete
+
+File defects as issues when they are discovered.
+
+Do not defer known defects without recording them.
+
+### Seed data
+
+The seed is the test fixture.
+
+```text
+SEED_VERSION 3
+```
+
+This version represents:
+
+* the high-fidelity dataset
+* the payment-domain fixture
+
+Dashboard tiles must reconcile to the cent.
+
+Changing seed data or a financial formula requires deliberate updates to the relevant conformance suites.
+
+A to-the-cent test failure means one of two things:
+
+* the specification changed
+* the code is wrong
+
+Do not classify it as flaky without evidence.
+
+---
+
+## 10.6 Files that must remain synchronized
+
+### Theme names
+
+The following theme names must stay synchronized:
+
+```text
+blue
+orange
+midnight
+```
+
+They are defined in three locations:
+
+```text
+lib/themes.ts
+app/layout.tsx
+app/css/styles.css
+```
+
+Specifically:
+
+* `lib/themes.ts` defines the available themes.
+* `app/layout.tsx` contains the anti-FOUC inline script.
+* `app/css/styles.css` contains the `[data-theme="..."]` blocks.
+
+When changing one, update all three.
+
+### Demo credentials
+
+Demo credentials must stay synchronized across:
+
+```text
+lib/auth/providers.ts
+prisma/seed.ts
+components/auth/signin-form.tsx
+```
+
+Relevant constants include:
+
+```text
+DEMO_USER
+DEMO_EMAIL
+autofill constants
+```
+
+When changing demo credentials, update all three locations.
+
+---
+
+## 10.7 End-to-end testing
+
+Playwright defines five projects:
+
+```text
+setup
+public
+authenticated
+authenticated-mutations
+empty-state
+```
+
+### Setup project
+
+The `setup` project performs demo authentication and writes session state to:
+
+```text
+tests/.auth/user.json
+```
+
+### Public project
+
+The `public` project runs without an authenticated session.
+
+### Authenticated project
+
+The `authenticated` project reuses the generated storage state.
+
+It contains only read-only specs that assert the seed-exact fixture.
+
+### Authenticated-mutations project
+
+The `authenticated-mutations` project holds the specs that insert real rows, such as add-card, imports, and payment flows.
+
+It depends on the `authenticated` project, so mutations run strictly after the seed-exact read-only assertions.
+
+### Empty-state project
+
+The `empty-state` project runs as a separate card-less user with its own storage state:
+
+```text
+tests/.auth/empty.json
+```
+
+It depends only on `setup` and never orders against the seeded-fixture specs.
+
+The Playwright configuration is:
+
+```text
+playwright.config.ts
+```
+
+### Running E2E tests
+
+```bash
+pnpm test:e2e
+```
+
+This command:
+
+* seeds the database
+* starts the development server when one is not already running
+
+Server startup is controlled through:
+
+```text
+webServer.command
+```
+
+In CI, set:
+
+```env
+CI=true
+```
+
+This forces a fresh server for each run.
+
+### Demo authentication in tests
+
+The Playwright `webServer.env` configuration sets:
+
+```env
+ENABLE_DEMO_AUTH=true
+```
+
+Do not reference:
+
+```env
+ENABLE_TEST_AUTH
+```
+
+That variable belongs to Ebia and does not exist in this project.
+
+### Port consistency
+
+Port `6020` is hardcoded in:
+
+* Playwright `baseURL`
+* `NEXTAUTH_URL`
+* development scripts
+
+Keep all three aligned.
+
+---
+
+## 10.8 Releases and commits
+
+Release Please controls versioning using conventional commit headers on `main`.
+
+The local Husky hook automatically prefixes branch commits with an emoji.
+
+Example:
+
+```text
+✨ feat: add card filter
+```
+
+Release Please cannot parse that format correctly on `main`.
+
+Therefore, feature pull requests must be squash-merged with a plain conventional title.
+
+Example:
+
+```text
+feat: add card filter
+```
+
+Do not include the emoji in the squash-merge title.
+
+Branch commits may retain the emoji style.
+
+### Version baseline
+
+The version baseline is:
+
+```text
+1.0.0
+```
+
+It is stored in:
+
+```text
+.release-please-manifest.json
+```
+
+It matches the tag:
+
+```text
+v1.0.0
+```
+
+on the initial commit.
+
+### Changelog behavior
+
+Update `CHANGELOG.md` only when a Release Please pull request merges.
+
+Do not update it for each commit or feature pull request.
+
+Merging the Release Please pull request creates:
+
+* the Git tag
+* the GitHub Release
+* the changelog update
+
+The repository setting that allows GitHub Actions to create and approve pull requests must remain enabled.
+
+If it is disabled, Release Please may fail silently on every push.
+
+### Bot-created pull requests
+
+CI runs on bot-created pull requests may display:
+
+```text
+action required
+```
+
+GitHub may hold those workflows for approval.
+
+The `main` branch push run is the authoritative signal.
+
+---
+
+# 11. Completion Standard
+
+These instructions are working when they produce:
+
+* fewer unnecessary changes
+* smaller and more reviewable diffs
+* fewer rewrites caused by overengineering
+* fewer assumptions presented as facts
+* earlier detection of ambiguity
+* consistent use of canonical documentation
+* UI work validated before hand-off
+* project rules preserved across sessions
+* verified outcomes instead of confidence-based completion
+
+The goal is not merely to produce code.
+
+The goal is to produce the smallest correct change, grounded in authoritative project evidence, validated against the project's technical and business rules.

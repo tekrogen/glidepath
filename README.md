@@ -4,7 +4,7 @@
 > The Tekrogen credit-card cockpit (product brand adopted 2026-07-11, Blueprint EDR-024).
 > Formerly the "Credit Card Manager" starter kit; v2 plan: `admin/internal/planning/PRODUCTION-BLUEPRINT.md`.
 
-A production-grade **Plaid-powered credit card manager** starter kit built with
+A production-grade **personal credit card manager** starter kit built with
 Next.js 16, React 19, Prisma, NextAuth, Tailwind v4, and shadcn/ui.
 
 Connect credit cards with Plaid, sync transactions automatically, and get a

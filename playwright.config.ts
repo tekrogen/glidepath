@@ -4,10 +4,12 @@ import path from 'node:path';
 /**
  * Playwright E2E Test Configuration
  *
- * Three project setup:
+ * Five project setup:
  * - setup: Signs in via demo credentials, saves storageState
  * - public: Tests public pages and auth redirects (no auth required)
- * - authenticated: Tests dashboard, settings, API routes (depends on setup)
+ * - authenticated: Read-only seed-exact specs (depends on setup)
+ * - authenticated-mutations: Row-inserting specs (depends on authenticated)
+ * - empty-state: Card-less user via empty.json (depends on setup)
  */
 
 const authFile = path.join(__dirname, 'tests', '.auth', 'user.json');
