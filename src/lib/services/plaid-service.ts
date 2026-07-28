@@ -2,12 +2,12 @@ import {
   Configuration,
   PlaidApi,
   PlaidEnvironments,
-  Products,
   CountryCode,
 } from 'plaid';
 import { prisma } from '@/lib/db/prisma';
 import { encrypt, decrypt } from '@/lib/utils/encryption';
 import { mapPlaidAccount, mapPlaidTransaction } from './plaid-transaction-mapper';
+import { parseProducts } from './plaid-products';
 import { initializeCategories } from '@/lib/categories-init';
 import type { AccountType, Prisma } from '@prisma/client';
 
@@ -100,21 +100,6 @@ export function plaidCredentials() {
 }
 
 // ─── Products config ─────────────────────────────────────────────────
-
-const PRODUCT_MAP: Record<string, Products> = {
-  transactions: Products.Transactions,
-  auth: Products.Auth,
-  identity: Products.Identity,
-  liabilities: Products.Liabilities,
-};
-
-function parseProducts(envVar: string | undefined, fallback: string): Products[] {
-  const str = envVar ?? fallback;
-  return str
-    .split(',')
-    .map((p) => PRODUCT_MAP[p.trim()])
-    .filter(Boolean);
-}
 
 const CLIENT_NAME = 'Credit Card Manager';
 
