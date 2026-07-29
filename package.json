@@ -6,11 +6,13 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
   "scripts": {
     "dev": "next dev -p 6020",
     "dev:https": "next dev --experimental-https -p 6020",
     "build": "next build",
+    "clean": "rm -rf .next tsconfig.tsbuildinfo",
+    "clean:all": "pnpm clean && rm -rf node_modules && pnpm install",
     "start": "next start -p 6020",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
