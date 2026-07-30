@@ -387,6 +387,15 @@ async function main() {
   await prisma.providerAutopayLink.deleteMany({ where: { card: { householdId: household.id } } });
   await prisma.financialAccount.deleteMany({ where: { householdId: household.id } });
   await prisma.creditCard.deleteMany({ where: { householdId: household.id } });
+  // Members the seed does not define (rows left by import exercises or tests)
+  // survive the upserts above — sweep them so a reseed is the exact fixture
+  // (#148). Runs after the card wipe so no ownerMemberId references remain.
+  await prisma.householdMember.deleteMany({
+    where: {
+      householdId: household.id,
+      displayName: { notIn: SEED_HOUSEHOLD.members.map((m) => m.displayName) },
+    },
+  });
   const cardIdsByName = new Map<string, string>();
   for (const c of SEED_CARDS) {
     const card = await prisma.creditCard.create({
