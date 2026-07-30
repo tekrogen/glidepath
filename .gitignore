@@ -198,7 +198,7 @@ next-env.d.ts
 .nuxt/
 
 # Gatsby
-public/
+/public/
 
 # Vuepress
 .vuepress/dist
