@@ -8,7 +8,7 @@ import { prisma } from '@/lib/db/prisma';
 import { encrypt, decrypt } from '@/lib/utils/encryption';
 import { mapPlaidAccount, mapPlaidTransaction } from './plaid-transaction-mapper';
 import { formatPlaidMask, planAccountLinks } from './plaid-account-matching';
-import { parseProducts } from './plaid-products';
+import { linkTokenProductOptions, parseProducts } from './plaid-products';
 import { initializeCategories } from '@/lib/categories-init';
 import type { AccountType, Prisma } from '@prisma/client';
 
@@ -119,8 +119,7 @@ export async function createLinkToken(userId: string): Promise<string> {
     ...plaidCredentials(),
     user: { client_user_id: userId },
     client_name: CLIENT_NAME,
-    products,
-    ...(optionalProducts.length > 0 ? { optional_products: optionalProducts } : {}),
+    ...linkTokenProductOptions(products, optionalProducts, new Date()),
     country_codes: [CountryCode.Us],
     language: 'en',
     webhook: process.env.PLAID_WEBHOOK_URL || undefined,

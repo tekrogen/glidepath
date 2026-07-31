@@ -23,3 +23,37 @@ export function parseProducts(envVar: string | undefined, fallback: string): Pro
     .map((p) => PRODUCT_MAP[p.trim()])
     .filter(Boolean);
 }
+
+/** Trailing-12-months statements window (#158). */
+export function statementsWindow(today: Date): { start_date: string; end_date: string } {
+  const start = new Date(today);
+  start.setFullYear(start.getFullYear() - 1);
+  return {
+    start_date: start.toISOString().slice(0, 10),
+    end_date: today.toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * Product-related fields for linkTokenCreate. Plaid REQUIRES a statements
+ * date-range object whenever the statements product is requested — required
+ * OR optional — otherwise the whole request fails INVALID_FIELD and no
+ * institution can be linked at all (#158, found live in the #109 walkthrough).
+ */
+export function linkTokenProductOptions(
+  products: Products[],
+  optionalProducts: Products[],
+  today: Date
+): {
+  products: Products[];
+  optional_products?: Products[];
+  statements?: { start_date: string; end_date: string };
+} {
+  const wantsStatements =
+    products.includes(Products.Statements) || optionalProducts.includes(Products.Statements);
+  return {
+    products,
+    ...(optionalProducts.length > 0 ? { optional_products: optionalProducts } : {}),
+    ...(wantsStatements ? { statements: statementsWindow(today) } : {}),
+  };
+}
