@@ -210,8 +210,12 @@ await ask("\nPress Enter to open the browser and begin… ")
 
 mkdirSync(ASSETS, { recursive: true })
 
-const browser = await chromium.launch({ headless: false })
-const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } })
+const browser = await chromium.launch({ headless: false, args: ["--window-size=1440,980"] })
+// viewport: null — the page tracks the window like a normal browser, so
+// testers can drag it narrow for responsive tasks and captures match what
+// they see (a pinned viewport clips on resize and re-asserts itself over
+// DevTools device emulation at screenshot time — #155).
+const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: null })
 const page = await ctx.newPage()
 await page.goto(BASE)
 

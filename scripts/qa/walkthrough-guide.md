@@ -32,6 +32,10 @@ Run it in a terminal from the project folder.
    in the browser window. Each task's "Expect:" text describes exactly
    what you should see.
 
+**Phone-width tasks:** just drag the browser window narrower — the page
+reflows like any normal browser, and screenshots capture exactly what you
+see. No DevTools needed.
+
 ## The keys
 
 At every task prompt:
