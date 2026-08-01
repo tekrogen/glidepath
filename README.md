@@ -150,6 +150,11 @@ Items deliberately deferred after the initial Playwright E2E wiring — revisit 
 5. **Broader page coverage.** Current specs stop at dashboard/settings/API smoke tests. Add specs for transactions (filter + CSV button), budgets CRUD, recurring page, and accounts list when those flows stabilize.
 6. **Local `reuseExistingServer` caveat.** When `pnpm dev` is already running, Playwright reuses it and does *not* apply `webServer.env` (`ENABLE_DEMO_AUTH=true`). Stop the stale server or match that env in `.env`, or auth setup fails.
 
+
+#### Resources
+
+https://www.mx.com/blog/a-list-of-personal-financial-management-pfm-providers-in-the-united-states/
+
 ## License
 
 Commercial template license — see [LICENSE.md](./LICENSE.md). You may build
