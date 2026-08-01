@@ -100,8 +100,15 @@ function ImportPlaidCardsInner({
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               <span>
                 {skipped > 0 && `${skipped} account${skipped === 1 ? "" : "s"} had already been imported. `}
-                {liabilities.failedItems > 0 &&
-                  "Some bank details could not be fetched — those cards show a sync alert."}
+                {liabilities.failedItems > 0 && (
+                  <>
+                    Some bank details could not be fetched — those cards are flagged under{" "}
+                    <Link href="/overview" className="underline underline-offset-2">
+                      Needs Attention
+                    </Link>{" "}
+                    on your Overview.
+                  </>
+                )}
               </span>
             </p>
           )}
