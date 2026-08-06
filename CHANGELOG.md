@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1](https://github.com/tekrogen/glidepath/compare/v1.3.0...v1.3.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* include the required statements date-range in linkTokenCreate ([8143ca3](https://github.com/tekrogen/glidepath/commit/8143ca33c182e15a2f4403a97c1f334fc74fb127))
+* partial-import banner points at Needs Attention on Overview ([2f8c4b5](https://github.com/tekrogen/glidepath/commit/2f8c4b550423ff6dc6d8fadf3b5994d7ea0e70be))
+* qa:walkthrough uses an unpinned viewport so window resize reflows ([b06b9e3](https://github.com/tekrogen/glidepath/commit/b06b9e39e0224fa4dd92727de7099b15a27bc830))
+
 ## [1.3.0](https://github.com/tekrogen/glidepath/compare/v1.2.0...v1.3.0) (2026-07-30)
 
 
