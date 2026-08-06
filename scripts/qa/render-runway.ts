@@ -3,7 +3,7 @@
  * engines produce from the SEED_VERSION 3 fixture, as a human-readable
  * record for admin/internal/reviews/. Read-only; no DB.
  *
- *   pnpm exec tsx scripts/qa/render-runway.ts
+ *   pnpm qa:runway
  */
 import {
   debtFreePlan,
