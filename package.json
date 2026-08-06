@@ -31,7 +31,9 @@
     "dev:lan": "node scripts/dev-lan.mjs",
     "import:cards": "tsx scripts/import-tracker.ts",
     "import:all": "pnpm import:cards",
-    "qa:walkthrough": "node scripts/qa/walkthrough-companion.mjs"
+    "qa:walkthrough": "node scripts/qa/walkthrough-companion.mjs",
+    "qa:runway": "tsx scripts/qa/render-runway.ts",
+    "qa:overview": "tsx scripts/qa/verify-overview-figures.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

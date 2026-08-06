@@ -4,10 +4,11 @@
  * uses (toFinanceCard → portfolioSummary) and print them for comparison with
  * the v1.2.0 walkthrough's §C expected values. Read-only.
  *
- *   pnpm exec tsx scripts/qa/verify-overview-figures.ts
+ *   pnpm qa:overview
  */
 import { PrismaClient } from "@prisma/client"
 
+import { DEMO_USER } from "../../src/lib/auth/providers"
 import { toFinanceCard } from "../../src/features/cards/server/mappers"
 import { portfolioSummary } from "../../src/lib/finance"
 import { formatMinor, formatShortDate } from "../../src/lib/formatting"
@@ -17,7 +18,7 @@ const prisma = new PrismaClient()
 async function main() {
   const rows = await prisma.creditCard.findMany({
     where: {
-      household: { members: { some: { user: { email: "demo@glidepath.cards" } } } },
+      household: { members: { some: { user: { email: DEMO_USER.email } } } },
     },
     include: { promoPeriods: { where: { status: "ACTIVE" } } },
   })
