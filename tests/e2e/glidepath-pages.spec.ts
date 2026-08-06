@@ -6,9 +6,37 @@
 import { expect, test } from "@playwright/test"
 
 import { SEED_CARDS } from "../../prisma/seed-data/glidepath-cards"
+import { promoPayoffPlans, type FinanceCard } from "../../src/lib/finance"
 
 const usd = (minor: bigint) =>
   (Number(minor) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })
+
+/**
+ * Promo payoff figures are wall-clock-derived (paymentsLeft shrinks as the
+ * promo end approaches — issue #166), so compute the expectations through the
+ * real engine from the seed instead of hardcoding a snapshot. The engine's
+ * math itself is pinned-date-verified in tests/unit/finance.
+ * Mirrors seed.ts: shelteredBalanceMinor = currentBalanceMinor.
+ */
+const promoPlans = promoPayoffPlans(
+  SEED_CARDS.map(
+    (c): FinanceCard => ({
+      id: c.cardName,
+      balanceMinor: c.currentBalanceMinor,
+      limitMinor: c.creditLimitMinor,
+      regularAprBps: c.regularAprBps,
+      minimumPaymentMinor: c.minimumPaymentMinor,
+      promo: c.promo
+        ? {
+            endsOn: new Date(`${c.promo.endsOn}T00:00:00Z`),
+            shelteredBalanceMinor: c.currentBalanceMinor,
+            regularAprBpsAfter: c.promo.regularAprBpsAfter,
+          }
+        : null,
+    })
+  ),
+  new Date()
+)
 
 test.describe("Overview page", () => {
   test("v2 header: hero total balance is the h1, with a utilization chip", async ({ page }) => {
@@ -85,8 +113,14 @@ test.describe("Overview page", () => {
     await expect(page.getByText(/6 cards are at 30%\+ utilization/)).toBeVisible()
     await expect(page.getByText("Horizon Cash", { exact: true }).first()).toBeVisible()
     await expect(page.getByText("0% Promo Payoff Plan")).toBeVisible()
-    await expect(page.getByText(/5 cards are not on track at the current minimum/)).toBeVisible()
-    await expect(page.getByText("$2,117.00/mo")).toBeVisible() // Cascade Platinum
+    const offTrack = promoPlans.filter((p) => p.onTrack === false).length
+    await expect(
+      page.getByText(new RegExp(`${offTrack} cards are not on track at the current minimum`))
+    ).toBeVisible()
+    const cascade = promoPlans.find((p) => p.cardId === "Cascade Platinum")!
+    await expect(
+      page.getByText(`${usd(cascade.requiredMonthlyMinor)}/mo`).first()
+    ).toBeVisible()
   })
 
   test("what-if slider recomputes the Hi-Fi anchor", async ({ page }) => {
